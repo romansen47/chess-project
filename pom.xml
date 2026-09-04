@@ -15,9 +15,9 @@
     <description>Complete Chess application build</description>
 
     <modules>
+        <module>spring-annotation-context-initializer-template</module>
         <module>chess</module>
         <module>chess-api</module>
     </modules>
 
 </project>
-

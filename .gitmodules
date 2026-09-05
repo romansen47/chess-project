@@ -6,6 +6,10 @@
 	path = chess
 	url = git@github.com:romansen47/chess.git
 	branch = work
+[submodule "chess-database"]
+	path = chess-database
+	url = git@github.com:romansen47/chess-database.git
+	branch = work
 [submodule "chess-api"]
 	path = chess-api
 	url = git@github.com:romansen47/chess-api.git

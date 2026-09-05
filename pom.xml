@@ -17,6 +17,7 @@
     <modules>
         <module>spring-annotation-context-initializer-template</module>
         <module>chess</module>
+        <module>chess-database</module>
         <module>chess-api</module>
     </modules>
 

@@ -5,16 +5,16 @@
 [submodule "chess"]
 	path = chess
 	url = git@github.com:romansen47/chess.git
-	branch = work
+	branch = master
 [submodule "chess-database"]
 	path = chess-database
 	url = git@github.com:romansen47/chess-database.git
-	branch = work
+	branch = master
 [submodule "chess-api"]
 	path = chess-api
 	url = git@github.com:romansen47/chess-api.git
-	branch = work
+	branch = master
 [submodule "chess-frontend"]
 	path = chess-frontend
 	url = git@github.com:romansen47/chess-frontend.git
-	branch = work
+	branch = master

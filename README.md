@@ -1,100 +1,149 @@
 # Chess Analysis Tool
 
-Chess Analysis Tool is a local, analysis-oriented chess application built around UCI engines and an embedded game database. Its primary purpose is to **study games and positions**, compare engine evaluations, replay games under deeper analysis, and work with personal or public PGN libraries.
-
-It is not intended primarily as a conventional chess game. Nevertheless, it includes the game functionality needed for a complete analysis workflow: you can start and play games, play against configured engines, import a single game, export the current game, and then analyse the resulting positions or game history.
+A local chess analysis application centered on engine-assisted game review, PGN analysis, and an embedded searchable chess database. It also includes normal chess-playing functionality, including playing against configured UCI engines, but its primary purpose is analysis rather than serving as a conventional chess game.
 
 ## Highlights
 
-- Interactive chessboard, move history, clocks, and normal game lifecycle.
-- Live UCI engine evaluation and multi-line analysis.
-- Deep analysis/replay of complete games.
-- Multiple UCI engines, reusable engine profiles, and separate profile assignments for White, Black, live evaluation, and deep analysis.
-- Play against a configured engine when desired.
-- Import/export of the current game in PGN.
-- Embedded SQLite chess database for large PGN libraries.
-- Search stored games by players, years, result, and Elo criteria.
-- Position and move statistics derived from the local game database.
-- English, German, and French browser-side UI localization.
+- Interactive board with legal move handling and game clocks.
+- Live engine evaluation with principal variations.
+- Deeper replay analysis of complete games.
+- Configurable UCI engines and reusable engine profiles.
+- Human-vs-engine and engine-assisted play.
+- Import and export of individual games in PGN format.
+- Embedded SQLite chess database with PGN library import, search, stored-game loading, and position statistics.
+- Browser UI with English, German, and French localization.
 
 ## Project structure
 
-The repository is a parent project with Git submodules:
+The project is composed of several Git submodules:
 
-- `chess` — chess rules, game model, notation/PGN handling, simulations, and UCI engine integration.
-- `chess-database` — embedded SQLite game library, PGN bulk import, search, and position statistics.
-- `chess-api` — Spring Boot application layer connecting the frontend, chess core, engines, analysis, and database.
-- `chess-frontend` — React/TypeScript/Vite user interface.
-- `spring-annotation-context-initializer-template` — supporting Spring initialization template used by the chess core.
+- `chess` — chess rules, notation, game loading/saving, and UCI engine integration.
+- `chess-database` — embedded SQLite chess database and PGN library importer.
+- `chess-api` — Spring Boot REST backend and application services.
+- `chess-frontend` — React/Vite browser frontend.
+- `spring-annotation-context-initializer-template` — reusable Spring annotation-context initializer dependency.
 
-Clone the project with its submodules initialized, for example with `git clone --recurse-submodules ...`. If the repository has already been cloned without submodules, initialize them before building.
+Clone the repository including its submodules:
+
+```bash
+git clone --recurse-submodules <repository-url>
+```
+
+For an existing clone:
+
+```bash
+git submodule update --init --recursive
+```
 
 ## UCI engines
 
-Engines are external programs and are not bundled with this repository. The application can work with UCI-compatible engines such as Stockfish and Leela Chess Zero (Lc0).
+The application works with UCI-compatible chess engines such as Stockfish and Leela Chess Zero (Lc0).
 
-### Recommended engine locations
+### Recommended locations
 
-For the standard project layout, place engine distributions in:
+The conventional engine directory for this project is:
 
-- **Windows:** `C:\usr\games`
-- **Unix/Linux:** `/usr/games`
+- Windows: `C:\usr\games`
+- Unix/Linux: `/usr/games`
 
-The automatic discovery service uses `/usr/games` as its default discovery path; with the project's normal Windows layout this corresponds to `C:\usr\games`. A different directory can be configured with the Java system property `chess.engine.discovery.directory`.
+On Unix-like systems, `/usr/games` is also the application's default automatic discovery directory. The directory can be overridden with the Java system property:
 
-Automatic discovery is deliberately conservative. It scans only regular executable files whose **filename contains `stockfish` or `lc0`**, case-insensitively, and then verifies each candidate with an actual UCI handshake. It does not blindly execute every file found in the directory. Paths resolving to the same executable are de-duplicated.
+```text
+-Dchess.engine.discovery.directory=/path/to/engines
+```
 
-This filename restriction applies to **automatic discovery only**. Other UCI engines, and engines stored in other directories, can be added explicitly through the engine configuration workflow. In a local graphical session the backend can open the operating system's native file chooser; Windows/WSL path selection is supported as well. The selected file still has to be an executable that responds correctly to UCI inspection.
+Automatic discovery is deliberately conservative. Only executable files whose names contain `stockfish` or `lc0`, case-insensitively, are considered. A matching file is not accepted merely by name: it must also start successfully and complete a UCI handshake. This prevents unrelated executables in the discovery directory from being launched as chess engines.
+
+Other UCI engines, and engines stored outside the discovery directory, can be added explicitly through the engine settings. On a graphical local installation the backend can open the operating system's file chooser and inspect the selected executable. WSL installations can use the Windows file chooser while the backend converts the selected path to its corresponding Linux path.
 
 ### Engine companion files
 
-Do not assume that an engine consists of a single executable. Keep the complete engine distribution together unless its own documentation says otherwise.
+Some engines are not self-contained executables. Keep all runtime files required by an engine together with its executable unless the engine documentation explicitly says otherwise.
 
-This is particularly important for **Lc0/Leela Chess Zero**. Lc0 requires a compatible neural-network weights file to perform useful chess evaluation, and some Windows distributions also depend on DLLs or other runtime libraries. The executable, weights, and required runtime files should therefore remain in the same engine directory when that is how the distribution is packaged. The Chess Analysis Tool registers the executable; it does not install or reconstruct missing third-party engine dependencies.
+Lc0, for example, normally requires a neural-network weights file. Depending on the distributed build and operating system, it may also depend on DLLs or other runtime libraries. If these files are missing, the executable may exist and still fail to start or fail its UCI inspection. A practical installation layout is therefore to keep the executable, weights, and any required shared libraries in the same engine directory.
 
-Engine definitions and profiles are persisted by default in `~/.chess/engine-configs.json`. This can be changed with `chess.engine.config.file`.
+Engine configuration is persisted by default in:
+
+```text
+~/.chess/engine-configs.json
+```
+
+A different file can be selected with:
+
+```text
+-Dchess.engine.config.file=/path/to/engine-configs.json
+```
+
+The application supports reusable engine profiles. A profile combines one registered engine with concrete UCI option values and can be assigned independently to White CPU, Black CPU, live evaluation, and deep analysis.
 
 ## PGN and the chess database
 
-There are two intentionally different PGN workflows:
+PGN is the interchange format used for importing chess games.
 
-1. **Import New Game** loads exactly one PGN game into the current-game/analysis workflow.
-2. **Chess Database → Import PGN** is intended for PGN files containing complete libraries or many games.
+There are two different import workflows:
 
-Files imported as chess databases must be in **PGN (Portable Game Notation)** format. The database importer streams the source, tracks import progress, and builds both game records and position/move statistics in the embedded SQLite database.
+- **Import New Game** accepts exactly one PGN game and opens it as the current game for analysis. The game is also stored in the local database.
+- **Chess Database → Import PGN** is intended for database libraries containing one or many games.
 
-The database is stored by default at `~/.chess/database/chess.db`; use the `chess.database.path` Java system property to choose another location.
+Database source files therefore need to be in PGN format. Proprietary database formats must first be exported or converted to PGN with suitable external software.
 
-### Large libraries
+The embedded SQLite database is created by default at:
 
-A large PGN file is not merely copied into SQLite. Games have to be parsed and replayed, metadata stored, duplicates handled, and position/move statistics aggregated. Consequently, importing a large collection may take **many minutes or several hours**, depending on the number of games, the number of positions, CPU performance, and storage speed.
-
-Bulk import runs as a background job with observable progress and controlled cancellation. Import data is staged so an incomplete, cancelled, or failed import is not exposed as a successfully imported library. The backend currently allows multipart PGN uploads up to 20 GB, but that limit should not be interpreted as a promise that files of that size will import quickly.
-
-## Building the application
-
-The backend application uses **Java 21**. The core and database modules currently target Java 17 bytecode and are consumed by the Java 21 Spring Boot application. Maven builds the Java modules through the parent reactor.
-
-The frontend uses React, TypeScript, Vite, and npm. The `chess-api` Maven build invokes `npm ci` followed by `npm run build` in `chess-frontend`, then packages the generated frontend into the Spring Boot application. A working Node/npm installation is therefore required for a complete Maven package build.
-
-From the project root, the intended complete build is:
-
-```bash
-mvn clean package
+```text
+~/.chess/database/chess.db
 ```
 
-After a successful package build, the Spring Boot artifact is produced as `chess-api/target/chess-app.jar` and can be started with:
+The path can be overridden with:
 
-```bash
-java -jar chess-api/target/chess-app.jar
+```text
+-Dchess.database.path=/path/to/chess.db
 ```
 
-Spring Boot uses port `8080` by default unless configured otherwise.
+The database stores games and derived position information so that games can be searched and positions can be examined statistically. Search criteria currently include player names, year range, result, and minimum Elo.
 
-## Local-first design
+### Large PGN libraries
 
-The application is designed around local engine executables and a local SQLite database. Engine file selection therefore refers to files visible to the machine running the backend, not arbitrary executables uploaded through a browser. This also allows heavyweight analysis and large database imports to remain on the user's own machine.
+Database imports run asynchronously and expose progress information, including bytes read and numbers of processed, imported, and skipped games. A running import can be cancelled.
+
+Importing a large historical PGN collection is computationally and I/O intensive: games are parsed, legal moves are replayed, duplicate checks are performed, and position statistics are generated and written to SQLite. Depending on library size, storage performance, CPU speed, and the complexity of the games, an import may take **several hours**. This is expected for very large collections and should not be interpreted as a stalled application solely because the operation takes a long time.
+
+The backend currently permits multipart uploads up to 20 GB. This is an upload limit, not a recommendation or a guarantee that a library of that size can be imported quickly or with modest disk usage.
+
+## Building
+
+The backend uses Java 21. The Maven reactor builds the Java modules and the `chess-api` build invokes the React/Vite frontend build before packaging the frontend into the Spring Boot application.
+
+Typical full build:
+
+```bash
+mvn clean install
+```
+
+The frontend remains a normal npm/Vite project internally; Maven invokes `npm ci` and `npm run build` from `chess-frontend` during the backend resource-generation phase.
+
+## Running
+
+The packaged application is a Spring Boot application provided by `chess-api`. When running the backend directly during frontend development, the Vite development server proxies `/api` requests to:
+
+```text
+http://127.0.0.1:8080
+```
+
+Engine executables run as local child processes of the application. Consequently, the machine running the backend must have permission to execute the configured engines and access their companion files.
+
+## Local application data
+
+Unless overridden through system properties, persistent application data is stored below the current user's home directory:
+
+```text
+~/.chess/
+├── engine-configs.json
+└── database/
+    └── chess.db
+```
+
+Backing up this directory preserves the local engine registry/profiles and chess database. Engine binaries themselves are not copied into this directory and need to be backed up separately if desired.
 
 ## Development status
 
-The project is under active development. In particular, the frontend and several larger backend classes are being refactored incrementally into smaller, responsibility-focused modules while preserving existing behavior and API contracts.
+This project is under active development. Analysis workflows, engine management, database features, localization, and frontend structure are evolving. Database schema and configuration formats may therefore change between development revisions.

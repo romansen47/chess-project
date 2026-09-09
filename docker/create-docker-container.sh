@@ -23,7 +23,7 @@ case "$BRANCH" in
         ;;
 esac
 
-if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+if [ -n "$(git status --porcelain --untracked-files=all --ignore-submodules=all)" ]; then
     echo "ERROR: The parent working tree contains local changes." >&2
     echo "Commit, stash or remove them before building a reproducible Docker image." >&2
     exit 1

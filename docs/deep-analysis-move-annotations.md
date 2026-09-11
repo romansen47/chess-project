@@ -159,7 +159,7 @@ regret = winning chance(best move) - winning chance(played move)
 
 At approximately **60% of final depth**:
 
-- early regret must be at least **15 percentage points**;
+- early regret must be at least **12 percentage points**;
 - regret must improve by at least **10 percentage points** by final depth.
 
 If the played move is outside the available early MultiPV set, the worst

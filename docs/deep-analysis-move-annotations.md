@@ -207,15 +207,24 @@ immediate reply to recover material. This prevents ordinary exchanges from
 being interpreted as sacrifices. Additional unrelated loss on that reply is not
 charged to the original move.
 
-The remaining material deficit relative to the root position must be at least
-**2 points**.
+The remaining material deficit relative to the root position is still measured
+for diagnostics, but material alone is considered strong enough to justify
+`!!` only from **4 points** onward.
+
+Smaller investments such as a typical exchange sacrifice (rook for bishop or
+knight, net 2 points) may still be objectively strong and may receive `!` or
+`!!` for other independent reasons, but the material investment by itself no
+longer creates a brilliant annotation.
 
 Examples the model is intended to distinguish:
 
 ```text
-Qxf6  ...gxf6       -> possible material-investment signal
-Bxc6  ...dxc6       -> ordinary equal exchange, no signal
-e4 ... later Q loss -> no signal for e4 because the e-pawn was not sacrificed
+Qxf6 ... forced sequence -> net investment is measured, even when the queen's
+                             gross value is larger
+Bxc6 ...dxc6          -> ordinary equal exchange, no signal
+...Bxf1 Kxf1          -> material gain for Black, no investment
+...Rxf7 ...Nxf7       -> net investment 2, recorded but insufficient alone for !!
+e4 ... later Q loss   -> no signal for e4 because the e-pawn was not sacrificed
 ```
 
 Promotions are excluded from this identity-based detector because the pawn

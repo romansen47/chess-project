@@ -252,9 +252,11 @@ move**. That exact piece must be captured within the six-ply horizon. Only then
 can the move have a material-investment signal.
 
 After the tracked piece is captured, CAT allows the sacrificing side one
-immediate reply to recover material. This prevents ordinary exchanges from
-being interpreted as sacrifices. Additional unrelated loss on that reply is not
-charged to the original move.
+immediate reply to recover material. This recovery reply is evaluated even when
+the capture occurred on the final ply of the six-ply detection horizon, so the
+reply itself is the first ply just beyond that horizon. This prevents ordinary
+exchanges at the horizon boundary from being interpreted as sacrifices.
+Additional unrelated loss on that reply is not charged to the original move.
 
 The remaining material deficit relative to the root position is still measured
 for diagnostics, but material alone is considered strong enough to justify
@@ -268,6 +270,8 @@ Examples the model is intended to distinguish:
 Qxf6 ... forced sequence -> net investment is measured, even when the queen's
                              gross value is larger
 Bxc6 ...dxc6          -> ordinary equal exchange, no signal
+Nc3 ...Nxc3 | bxc3     -> capture at horizon boundary; immediate recovery still
+                          counts, no false three-point investment
 ...Bxf1 Kxf1          -> material gain for Black, no investment
 ...Rxf7 ...Nxf7       -> net investment 2, recorded but insufficient alone for !!
 e4 ... later Q loss   -> no signal for e4 because the e-pawn was not sacrificed

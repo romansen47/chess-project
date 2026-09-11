@@ -11,8 +11,8 @@ interesting for a human to find.
 
 - `!` — a critical, non-trivial best move.
 - `!!` — an objectively sound move with strong human-difficulty evidence.
-- `?` — an objective loss of at least 1.0 pawn relative to the best move.
-- `??` — an objective loss of at least 3.0 pawns relative to the best move.
+- `?` — a practical winning-chance loss of at least 10 percentage points relative to the best move.
+- `??` — a practical winning-chance loss of at least 25 percentage points relative to the best move.
 
 `!!` is not simply a stronger `!`. A brilliant move may finish at rank 2 or
 3, while `!` requires the final best move.
@@ -95,13 +95,26 @@ logistic mapping in `EvaluationScoring`.
 
 ### Layer 1: objective quality
 
-The final loss relative to the best engine candidate is calculated first.
+The final practical winning-chance loss relative to the best engine candidate
+is calculated first:
+
+```text
+winChanceLoss =
+    winPercent(best move)
+    - winPercent(played move)
+```
 
 Current thresholds:
 
-- loss < 1.0 pawn: objectively acceptable for annotation purposes;
-- loss >= 1.0 pawn: `?`;
-- loss >= 3.0 pawns: `??`.
+- loss < 10 percentage points: objectively acceptable for annotation purposes;
+- loss >= 10 percentage points: `?`;
+- loss >= 25 percentage points: `??`.
+
+The raw pawn-evaluation difference is deliberately not used for these symbols.
+Near equality, the new thresholds remain close to the old 1-pawn / 3-pawn
+semantics. In a position that is already overwhelmingly won, however, a change
+such as +17.77 to +12.82 represents less than one percentage point of practical
+winning chance and therefore does not become `??`.
 
 This layer has priority over human-interest signals. A sacrifice or surprising
 idea does **not** turn an objective mistake/blunder into `!!`.
@@ -248,7 +261,8 @@ Current regression coverage includes:
 - ordinary equal exchange -> no material `!!`;
 - normal development -> no material `!!`;
 - Black score normalization;
-- `?` and `??` thresholds.
+- practical winning-chance thresholds for `?` and `??`;
+- a large raw evaluation drop in an already won position does not automatically become `??`.
 
 Real games that expose false positives or negatives should become new synthetic
 regression fixtures before thresholds are changed.

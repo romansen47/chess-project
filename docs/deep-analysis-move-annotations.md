@@ -1,7 +1,9 @@
 # DeepAnalysis move annotations
 
-CAT's move annotations are an experimental **DeepAnalysis-only** feature.
-Live/infinite evaluation and normal engine play do not use this classifier.
+CAT's move annotations are an experimental analysis feature. Finite
+DeepAnalysis stores annotations for the complete game; analysis-mode Live
+Evaluation can re-classify the currently selected historical move with the same
+classifier. Normal engine play does not use move annotations.
 
 The goal is not to copy one chess site's labels. CAT combines objective engine
 quality with separate signals for moves that are unusually difficult or
@@ -50,6 +52,43 @@ snapshots from the same search.
 
 This replaced the former stateful combination of
 `getBestLines(...)` plus `getLastDepthHistory()`.
+
+### Live move assessment
+
+Analysis-mode Live Evaluation reuses the same chess-core classifier instead of
+implementing a second set of annotation rules.
+
+For a selected historical move, CAT keeps the existing infinite continuation
+analysis of the position **after** the move. In parallel, a second evaluation
+engine process analyzes the position **before** the move using the same runtime
+evaluation profile.
+
+The pre-move search contributes:
+
+- current MultiPV candidates;
+- one immutable snapshot for each completed search depth;
+- the early/middle/late search development used by the brilliance detectors.
+
+The existing continuation search contributes the current evaluation of the
+position after the played move. Both are combined into a transient
+`DeepAnalysisResult` and passed to `MoveAnnotationClassifier`.
+
+Live annotations are transient:
+
+- until the pre-move search has a usable result, the stored DeepAnalysis
+  annotation remains visible;
+- once a live result is ready, it overrides the stored annotation for the
+  selected ply only;
+- a ready live result may also be **no symbol**, temporarily removing the
+  stored symbol;
+- the live symbol may change as search depth grows;
+- disabling Live Evaluation immediately restores the stored DeepAnalysis
+  annotation;
+- temporary analysis variations are excluded from historical-move assessment.
+
+A second engine process is intentional here: it preserves the existing live
+continuation view while the pre-move position is assessed independently. Tests
+mock the engine factory and never require a real UCI executable.
 
 ### Classifier package
 

@@ -127,8 +127,9 @@ evaluated, it calls the core classifier with:
 - the evaluation of the resulting position as a fallback when the played move
   was not present in final MultiPV.
 
-The resulting domain `MoveAnnotation` is converted to `MoveAnnotationDto` and
-attached directly to the corresponding `AnalysisProfilePointDto`.
+The resulting domain `MoveAnnotation` is converted by
+`MoveAnnotationDtoMapper` to `MoveAnnotationDto` and attached directly to
+the corresponding `AnalysisProfilePointDto`.
 
 Intermediate depth history is no longer serialized to the browser.
 
@@ -324,7 +325,8 @@ Current covered behaviors include:
   engine loss would otherwise qualify as `??`, verifying annotation
   precedence;
 - ordinary development is not mistaken for a material sacrifice;
-- Black evaluations are ranked from Black's point of view.
+- Black evaluations are ranked from Black's point of view;
+- `?` and `??` retain their configured loss thresholds.
 
 Future regression fixtures should be added whenever a real analyzed game causes
 a threshold or semantic rule to change.

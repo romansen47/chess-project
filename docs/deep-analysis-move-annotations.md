@@ -89,8 +89,20 @@ Live annotations refine the current analysis profile:
 - selecting another move and returning to the refined move keeps the latest
   live classification;
 - starting a new DeepAnalysis creates a fresh analysis profile and therefore
-  recalculates annotations from scratch;
-- temporary analysis variations are excluded from historical-move assessment.
+  recalculates annotations from scratch.
+
+Temporary analysis variations use the same live classifier, but deliberately
+have different lifetime semantics:
+
+- only the **latest move of the current variation** is assessed;
+- the annotation is shown only on the main board, on that move's destination
+  square;
+- it is never written into the stored analysis profile or move list;
+- a ready live result with no symbol removes the board badge immediately;
+- deeper live search may set, change or remove the badge again;
+- changing the variation resets the live result before the new move is
+  assessed;
+- leaving the variation discards the variation annotation completely.
 
 A second engine process is intentional here: it preserves the existing live
 continuation view while the pre-move position is assessed independently. Tests

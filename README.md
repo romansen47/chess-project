@@ -2,6 +2,22 @@
 
 A local chess analysis application centered on engine-assisted game review, PGN analysis, and an embedded searchable chess database. It also includes normal chess-playing functionality, including playing against configured UCI engines, but its primary purpose is analysis rather than serving as a conventional chess game.
 
+CAT is intended to sit between lightweight online analysis and large professional chess suites: **more depth and control than a typical web analysis, with substantially less overhead than a traditional all-in-one chess database environment.** Games, engine configuration, and the local database remain under the user's control.
+
+## Who is CAT for?
+
+CAT is primarily aimed at chess players who want to analyze seriously without turning their analysis workflow into a large software ecosystem.
+
+It may be especially useful for:
+
+- **Club players and ambitious hobby players** who want to review their own games with engine lines, deeper replay analysis, and compact move-quality annotations.
+- **Players with their own PGN collections** who want a searchable local database and position statistics without depending on a cloud service.
+- **Engine enthusiasts** who want to configure and compare UCI engines such as Stockfish and Lc0, maintain reusable engine profiles, and run engine-assisted or engine-vs-engine play.
+- **Offline- and privacy-oriented users** who prefer their games, database, and analysis configuration to stay on their own machine.
+- **Technically interested chess players** who value a comparatively transparent and lightweight tool where engines and analysis settings remain visible and controllable.
+
+CAT is not intended to replace every feature of mature professional suites. Its focus is a compact local analysis workflow built around PGN, UCI engines, a searchable database, and understandable analysis tools.
+
 ## Highlights
 
 - Interactive board with legal move handling and game clocks.
@@ -12,7 +28,7 @@ A local chess analysis application centered on engine-assisted game review, PGN 
 - Human-vs-engine and engine-assisted play.
 - Import and export of individual games in PGN format.
 - Embedded SQLite chess database with PGN library import, search, stored-game loading, and position statistics.
-- Browser UI with English, German, and French localization.
+- Browser UI with English, German, French, Italian, and Spanish localization.
 
 ## Project structure
 

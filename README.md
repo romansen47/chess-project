@@ -7,6 +7,7 @@ A local chess analysis application centered on engine-assisted game review, PGN 
 - Interactive board with legal move handling and game clocks.
 - Live engine evaluation with principal variations.
 - Deeper replay analysis of complete games.
+- Experimental DeepAnalysis move annotations (`!`, `!!`, `?`, `??`) with documented human-oriented heuristics.
 - Configurable UCI engines and reusable engine profiles.
 - Human-vs-engine and engine-assisted play.
 - Import and export of individual games in PGN format.
@@ -143,6 +144,12 @@ Unless overridden through system properties, persistent application data is stor
 ```
 
 Backing up this directory preserves the local engine registry/profiles and chess database. Engine binaries themselves are not copied into this directory and need to be backed up separately if desired.
+
+## Analysis design notes
+
+The DeepAnalysis move-quality annotation concept, thresholds, architecture, and
+known limitations are documented in
+[`docs/deep-analysis-move-annotations.md`](docs/deep-analysis-move-annotations.md).
 
 ## Development status
 

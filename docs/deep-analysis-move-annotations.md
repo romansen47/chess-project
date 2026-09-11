@@ -158,7 +158,27 @@ The played move must:
 
 It then needs at least one of the following independent signals.
 
-##### Signal A: deep discovery by regret reduction
+##### Deep discovery: relative search phases
+
+Deep discovery deliberately uses **relative** phases of the engine's own search
+rather than absolute depth numbers. This matters because a depth value from
+Stockfish is not directly comparable with a depth value from Lc0.
+
+The current phases are:
+
+```text
+early   25-40% of final depth
+middle  45-65% of final depth
+late    75-100% of final depth
+```
+
+At least two usable snapshots are required in every phase. Phase measurements
+use medians, so one volatile depth does not create a brilliant annotation by
+itself.
+
+A deep-discovery `!!` can be produced by either of two independent patterns.
+
+###### Signal A: rank/regret discovery
 
 A rank change by itself is **not** evidence of brilliance. Opening moves can
 move from rank 4 to rank 2 while all candidate evaluations remain virtually
@@ -170,20 +190,49 @@ Instead CAT measures **regret**:
 regret = winning chance(best move) - winning chance(played move)
 ```
 
-At approximately **60% of final depth**:
+For rank/regret discovery:
 
-- early regret must be at least **12 percentage points**;
-- regret must improve by at least **10 percentage points** by final depth.
+- median early regret must be at least **12 percentage points**;
+- total regret improvement from early to late must be at least
+  **10 percentage points**;
+- regret must improve by at least **3 percentage points** from early to middle;
+- regret must improve by at least **3 percentage points** from middle to late;
+- in the late phase the move must remain Top 3 in at least two of the last
+  three usable snapshots.
 
-If the played move is outside the available early MultiPV set, the worst
-returned candidate is used as a conservative upper bound for the move's early
+If the played move is outside the available MultiPV set in a snapshot, the
+worst returned candidate is used as a conservative upper bound for the move's
 score. This yields a lower bound on regret without treating absence/rank alone
 as brilliance.
 
-Late stability is also required: starting around **75% of final depth**, the
-move must remain Top 3 in at least two of the last three usable snapshots.
+###### Signal B: strength discovery
 
-##### Signal B: causal material investment
+Some moves are already plausible candidates early, but the engine only
+discovers **how strong the move itself is** as the search develops. This is
+different from rank/regret discovery: a move may already be rank 1 while its
+practical winning chance rises dramatically.
+
+For strength discovery:
+
+- the move must finish at final **rank 1**;
+- it must be present in at least two snapshots in every search phase;
+- it must be Top 3 in at least **50%** of its usable early snapshots;
+- median practical winning chance must improve by at least
+  **5 percentage points** from early to middle;
+- it must improve by at least another **5 percentage points** from middle to
+  late;
+- total early-to-late improvement must be at least **20 percentage points**;
+- the move must remain rank 1 in at least two of the last three late snapshots.
+
+Winning chance rather than raw centipawns is used intentionally. A change from
++5 to +10 in an already overwhelmingly won position therefore does not look
+artificially spectacular merely because the centipawn number doubled.
+
+Kramnik-Leko 2004 `...Qd3` is a regression example for this second pattern:
+the move is already a serious candidate at low depth, but its practical
+strength grows dramatically through the middle and late search phases.
+
+##### Signal C: causal material investment
 
 Material values are:
 
@@ -260,7 +309,9 @@ Current regression coverage includes:
 - critical non-trivial best move -> `!`;
 - shuffled MultiPV input order does not affect ranking;
 - close opening rank movement -> no deep-discovery `!!`;
-- large regret reduction with late stability -> `!!`;
+- large regret reduction across early/middle/late phases -> `!!`;
+- Kramnik-Leko `...Qd3` strength discovery -> `!!`;
+- stable best move with only small strength growth -> no `!!`;
 - sound queen sacrifice -> material `!!`;
 - objectively bad queen sacrifice -> remains `??`;
 - unrelated later material loss -> does not make the root move brilliant;

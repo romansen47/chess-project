@@ -4,7 +4,7 @@ This document describes CAT's experimental move-quality annotations shown after
 moves in the move list.
 
 The annotations are deliberately a **DeepAnalysis-only** feature. Live/infinite
-evaluation, normal engine play, and other engine consumers must not use this
+evaluation, normal engine play, and other engine consumers do not use this
 classification logic.
 
 ## Goals
@@ -26,55 +26,129 @@ not have to be the engine's number-one move. It only has to finish inside the
 configured final Top-N set, currently Top 3, and satisfy at least one brilliance
 signal.
 
-## Data flow and architectural boundary
+## Architecture
 
-The feature currently spans three layers, but each layer has one specific
-responsibility.
+The classification is domain logic and therefore lives in the **`chess`
+module**, not in the React frontend.
 
-### chess
+The intended dependency direction is:
+
+```text
+DeepAnalysisUciEngine
+        |
+        v
+DeepAnalysisResult
+  - finalLines
+  - depthHistory
+        |
+        v
+MoveAnnotationClassifier
+        |
+        v
+chess-api DTO mapping
+        |
+        v
+chess-frontend display only
+```
+
+### `chess`: finite search result
 
 `DeepAnalysisUciEngine` performs the finite UCI search used by DeepAnalysis.
 
-The engine already receives `info depth ... multipv ... pv ...` lines while the
-search is running. For DeepAnalysis it now preserves completed intermediate
-depth snapshots instead of discarding all information below the final depth.
+During one search the engine receives UCI lines such as:
 
-The normal live/infinite evaluation implementation is not changed by this
-history collection.
+```text
+info depth 10 multipv 1 score cp 35 pv ...
+info depth 10 multipv 2 score cp 10 pv ...
+```
 
-### chess-api
+Intermediate usable depth snapshots and the final variants are returned
+together in one immutable `DeepAnalysisResult`:
+
+```java
+DeepAnalysisResult
+    finalLines
+    depthHistory
+```
+
+This replaces the former two-step contract:
+
+```text
+getBestLines(...)
+getLastDepthHistory()
+```
+
+That old design was stateful: the caller had to assume that "last history"
+still belonged to the preceding `getBestLines` invocation.
+`DeepAnalysisResult` makes that relationship explicit and atomic.
+
+The compatibility method `getBestLines(...)` remains because
+`DeepAnalysisEngine` also implements the general `EvaluationEngine`
+contract. DeepAnalysis consumers themselves use `analyze(...)`.
+
+Live/infinite evaluation does not produce a `DeepAnalysisResult` and does not
+run the annotation classifier.
+
+### `chess`: classification
+
+The classifier is located below:
+
+```text
+demo.chess.analysis.annotation
+```
+
+Responsibilities are separated into small classes:
+
+- `MoveAnnotationClassifier` — annotation precedence and orchestration.
+- `MoveAnnotationPolicy` — all heuristic thresholds.
+- `EvaluationScoring` — mover-centric score normalization, winning chances,
+  MultiPV sorting, and root-move matching.
+- `OnlyMoveDetector` — the triviality filter for `!`.
+- `BrilliantMoveDetector` — combines independent `!!` signals.
+- `MaterialInvestmentDetector` — replays a final PV and measures temporary
+  material drawdown.
+- `MoveAnnotation` — domain result.
+- `DeepAnalysisResult` — engine-search result consumed by the classifier.
+
+New annotation heuristics belong in this domain package. They should not be
+implemented in the API or frontend.
+
+### `chess-api`: orchestration and DTO mapping
 
 `AnalysisReplayService` owns the complete-game DeepAnalysis replay.
 
-For each analyzed position it returns:
+For move N, the service keeps the `DeepAnalysisResult` of the position before
+that move. After move N has been played and the resulting position has been
+evaluated, it calls the core classifier with:
 
-- the final engine lines,
-- the final evaluation and depth,
-- compact intermediate depth snapshots.
+- the position before the move;
+- the played UCI move;
+- the previous position's `DeepAnalysisResult`;
+- the evaluation of the resulting position as a fallback when the played move
+  was not present in final MultiPV.
 
-Intermediate snapshots contain only what the annotation algorithm needs:
-depth, candidate evaluation, and the board position after the candidate's first
-move. Full PVs are not duplicated for every intermediate depth.
+The resulting domain `MoveAnnotation` is converted to `MoveAnnotationDto` and
+attached directly to the corresponding `AnalysisProfilePointDto`.
 
-The final engine lines still contain their board positions along the PV. Those
-positions are used for material-investment detection.
+Intermediate depth history is no longer serialized to the browser.
 
-### chess-frontend
+### `chess-frontend`: display only
 
-The frontend classifies the already-produced DeepAnalysis data. The code is
-split by responsibility:
+The frontend does **not** calculate move quality.
 
-- `moveAnnotationPolicy.ts` — all heuristic thresholds.
-- `moveAnnotationScoring.ts` — score normalization, sorting, winning chances,
-  and material arithmetic.
-- `onlyMoveDetection.ts` — triviality filter for `!`.
-- `brilliantMoveDetection.ts` — independent brilliance signals for `!!`.
-- `moveAnnotationModel.ts` — annotation result types.
-- `moveAnnotations.ts` — orchestration and precedence only.
+`AnalysisProfilePoint.annotation` already contains the result calculated by
+the core. The frontend only:
 
-This separation is intentional. New heuristics should normally be implemented
-inside a detector or scoring helper rather than added directly to the
-orchestrator.
+- indexes annotations by ply;
+- renders the badge after SAN;
+- formats localized tooltips.
+
+The former frontend files containing heuristic logic
+(`moveAnnotationPolicy.ts`, `brilliantMoveDetection.ts`,
+`onlyMoveDetection.ts`, and scoring helpers) have been removed.
+
+This boundary is important for future consumers such as PGN annotation: they
+can reuse the same core classifier without reproducing browser logic.
 
 ## Engine-score normalization
 
@@ -87,14 +161,13 @@ player who made the move:
 - Black move: lower White-centric evaluation is better.
 
 CAT never assumes that an engine's MultiPV number is a quality ranking. The
-received candidate lines are sorted independently by the normalized mover
-score. This is important for engines that emit MultiPV lines in a different
-order.
+received candidate lines are sorted independently by normalized mover score.
+This is important because engines may emit MultiPV lines in different orders.
 
 For some thresholds CAT maps centipawn evaluations to practical winning
-chances with the same logistic form used by the existing annotation prototype.
-This avoids treating a two-pawn difference near equality exactly like a
-two-pawn difference in an already overwhelming position.
+chances using the current logistic mapping in `EvaluationScoring`. This avoids
+treating the same raw pawn difference identically near equality and in an
+already overwhelming position.
 
 ## Annotation precedence
 
@@ -114,7 +187,7 @@ meeting one of CAT's brilliance criteria.
 
 ## `!`: critical but non-trivial best move
 
-A move is first considered for `!` only when it is the final best move.
+A move is considered for `!` only when it is the final best move.
 
 ### Final criticality
 
@@ -130,18 +203,18 @@ At the final DeepAnalysis depth:
 A move that is obvious very early in the search should not receive `!` merely
 because every alternative is terrible.
 
-The early window is currently **30% through 50% of the final search depth**.
+The early window is currently **30% through 50% of final search depth**.
 
-An early snapshot counts as "obvious" when:
+An early snapshot counts as obvious when:
 
 - the played move is already rank 1; and
 - its winning-chance lead over rank 2 is at least **10 percentage points**.
 
 If at least **70%** of usable snapshots in the early window are obvious, the
 move is treated as trivial and `!` is suppressed. At least two usable early
-snapshots are required before CAT suppresses an annotation.
+snapshots are required before CAT suppresses the annotation.
 
-This is designed to reject cases such as an obvious pawn recapture after a
+This is intended to reject cases such as an obvious pawn recapture after a
 piece exchange.
 
 ## `!!`: brilliant move
@@ -170,9 +243,8 @@ This catches moves whose strength only becomes visible after deeper search.
 
 ### Signal B: material investment
 
-This signal detects humanly difficult sacrifices that may not look dramatic in
-the final engine evaluation because positional compensation is already included
-in that evaluation.
+This signal detects humanly difficult sacrifices whose positional compensation
+may hide the material cost in the engine evaluation.
 
 Material values are currently:
 
@@ -183,9 +255,9 @@ Material values are currently:
 - queen = 9
 - king = 0
 
-For the final PV of the played Top-3 move, CAT compares the mover's material
-balance with the root position and finds the largest material drawdown during
-the first **6 plies** of the PV.
+For the final PV of the played Top-3 move, CAT reconstructs the position in the
+core and compares the mover's material balance with the root position. It finds
+the largest drawdown during the first **6 plies** of the PV.
 
 If that drawdown is at least **2 material points**, the move has a material
 investment signal.
@@ -195,8 +267,9 @@ sacrifice much later in a long PV could incorrectly make the original move look
 brilliant.
 
 The calculation uses the minimum material balance along the PV rather than only
-the board directly after the played move. This is essential for sacrifices such
-as a queen offer that is accepted on the opponent's reply.
+the board directly after the played move. This catches sacrifices where, for
+example, a queen is offered on the played move and accepted on the opponent's
+reply.
 
 The material does **not** have to be won back later. A permanent exchange of
 material for initiative, king safety, passed pawns, or other positional
@@ -209,24 +282,59 @@ one `!!`, while the tooltip reports both reasons.
 
 ## `?` and `??`
 
-These labels currently use the loss from the best final candidate from the
-mover's point of view:
+These labels use the loss from the best final candidate from the mover's point
+of view:
 
 - `?` at **1.0 pawn** loss or more;
 - `??` at **3.0 pawns** loss or more.
 
-When the played move itself is not present in the final MultiPV candidates, CAT
-falls back to the evaluation of the resulting position from the next
-DeepAnalysis point. This mixes two separate searches and is therefore less
-clean than comparing lines from one root position. It is accepted for the
-current prototype but should be revisited.
+When the played move itself is absent from final MultiPV, CAT falls back to the
+evaluation of the resulting position. This compares data from two consecutive
+searches and is therefore less pure than comparing candidates from one root
+search. It is retained for the current prototype and should be revisited if a
+better root-move evaluation becomes available.
+
+## Testing strategy
+
+Annotation tests deliberately have **no real chess-engine dependency**.
+
+The main regression suite is:
+
+```text
+chess/src/test/java/demo/chess/analysis/annotation/
+    MoveAnnotationClassifierTest.java
+```
+
+Tests construct synthetic `EngineLine` objects and synthetic
+`DeepAnalysisResult` depth histories. The only real chess functionality used
+is CAT's own board model and legal-move resolver when a PV has to be replayed
+for material-investment detection.
+
+No Stockfish or Lc0 executable is started. No engine binary is required on the
+test machine. The tests are therefore deterministic and suitable for the
+normal Maven unit-test phase.
+
+Current covered behaviors include:
+
+- an obvious early best move is filtered out instead of receiving `!`;
+- a critical but non-trivial best move receives `!`;
+- MultiPV input order does not define candidate ranking;
+- a move discovered only at deeper search receives `!!`;
+- a temporary queen investment can receive `!!` even when its numerical
+  engine loss would otherwise qualify as `??`, verifying annotation
+  precedence;
+- ordinary development is not mistaken for a material sacrifice;
+- Black evaluations are ranked from Black's point of view.
+
+Future regression fixtures should be added whenever a real analyzed game causes
+a threshold or semantic rule to change.
 
 ## Known limitations
 
 ### First move of a game
 
 The initial profile point is currently fixed to +0.30 and contains no engine
-lines. Therefore the first move cannot receive these annotations yet.
+search result. Therefore the first move cannot receive these annotations yet.
 
 ### MultiPV availability
 
@@ -251,29 +359,22 @@ bishop pair, pawn structure, king safety, and other positional concepts. Those
 concepts remain in the engine evaluation. Material is used only as an
 additional human-difficulty signal.
 
-### No automated heuristic test suite yet
-
-The frontend currently has no dedicated unit-test runner for these rules. This
-is the biggest maintainability gap in the annotation subsystem. Before the
-heuristics become stable or are persisted into PGN, representative position
-fixtures should be added for:
-
-- obvious recaptures that must not receive `!`;
-- known only moves that should receive `!`;
-- deep-discovery combinations that should receive `!!`;
-- material sacrifices that should receive `!!`;
-- false-positive sacrifices and ordinary exchanges;
-- White and Black score normalization;
-- MultiPV order independence.
+The material replay currently assumes the same standard-start move history used
+by the DeepAnalysis UCI command. If DeepAnalysis later gains arbitrary FEN or
+Chess960 roots, both engine positioning and material replay must evolve
+together.
 
 ## Tuning policy
 
-All numeric thresholds belong in
-`chess-frontend/src/chess/analysis/moveAnnotationPolicy.ts`.
+All numeric thresholds belong in:
 
-When tuning the system, change the policy values rather than scattering numbers
-through detector implementations. Prefer testing against known games and
-document the examples that motivated a threshold change.
+```text
+chess/src/main/java/demo/chess/analysis/annotation/MoveAnnotationPolicy.java
+```
 
-The current rules are an experimental first model, not a claim that `!` or
-`!!` can be determined objectively from engine output alone.
+When tuning the system, change policy values rather than scattering numbers
+through detector implementations. Prefer testing against known games and add a
+regression fixture for every threshold change motivated by a concrete example.
+
+The current rules are an experimental model, not a claim that `!` or `!!`
+can be determined objectively from engine output alone.

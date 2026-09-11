@@ -2,16 +2,33 @@
 
 A local chess analysis application centered on engine-assisted game review, PGN analysis, and an embedded searchable chess database. It also includes normal chess-playing functionality, including playing against configured UCI engines, but its primary purpose is analysis rather than serving as a conventional chess game.
 
+CAT is intended to sit between lightweight online analysis and large professional chess suites: **more depth and control than a typical web analysis, with substantially less overhead than a traditional all-in-one chess database environment.** Games, engine configuration, and the local database remain under the user's control.
+
+## Who is CAT for?
+
+CAT is primarily aimed at chess players who want to analyze seriously without turning their analysis workflow into a large software ecosystem.
+
+It may be especially useful for:
+
+- **Club players and ambitious hobby players** who want to review their own games with engine lines, deeper replay analysis, and compact move-quality annotations.
+- **Players with their own PGN collections** who want a searchable local database and position statistics without depending on a cloud service.
+- **Engine enthusiasts** who want to configure and compare UCI engines such as Stockfish and Lc0, maintain reusable engine profiles, and run engine-assisted or engine-vs-engine play.
+- **Offline- and privacy-oriented users** who prefer their games, database, and analysis configuration to stay on their own machine.
+- **Technically interested chess players** who value a comparatively transparent and lightweight tool where engines and analysis settings remain visible and controllable.
+
+CAT is not intended to replace every feature of mature professional suites. Its focus is a compact local analysis workflow built around PGN, UCI engines, a searchable database, and understandable analysis tools.
+
 ## Highlights
 
 - Interactive board with legal move handling and game clocks.
 - Live engine evaluation with principal variations.
 - Deeper replay analysis of complete games.
+- Experimental DeepAnalysis move annotations (`!`, `!!`, `?`, `??`) with documented human-oriented heuristics.
 - Configurable UCI engines and reusable engine profiles.
 - Human-vs-engine and engine-assisted play.
 - Import and export of individual games in PGN format.
 - Embedded SQLite chess database with PGN library import, search, stored-game loading, and position statistics.
-- Browser UI with English, German, and French localization.
+- Browser UI with English, German, French, Italian, and Spanish localization.
 
 ## Project structure
 
@@ -121,6 +138,41 @@ mvn clean install
 
 The frontend remains a normal npm/Vite project internally; Maven invokes `npm ci` and `npm run build` from `chess-frontend` during the backend resource-generation phase.
 
+## Continuous integration and releases
+
+GitHub Actions validates the full Maven reactor, including all submodules and
+the frontend build.
+
+The branch roles are intentional:
+
+- `work` is the active development branch.
+- `master` is the basis for releasable versions.
+
+The CI workflow runs `mvn clean install` on every push to `work` and
+`master`, on pull requests targeting `master`, and when triggered manually
+from GitHub Actions.
+
+A release is created only by pushing a version tag such as `v0.1.0`. The
+release workflow first verifies that the tagged commit is contained in
+`master`, then runs the complete Maven build and tests again. Only after a
+successful build does it create a GitHub Release containing:
+
+- `cat-<tag>.jar` — the packaged Spring Boot application including the
+  frontend;
+- `cat-<tag>.jar.sha256` — SHA-256 checksum for the released JAR.
+
+Typical release sequence:
+
+```bash
+git checkout master
+git pull
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Do not create release tags directly from `work`. The workflow rejects tags
+whose commit is not part of `master`.
+
 ## Running
 
 The packaged application is a Spring Boot application provided by `chess-api`. When running the backend directly during frontend development, the Vite development server proxies `/api` requests to:
@@ -143,6 +195,12 @@ Unless overridden through system properties, persistent application data is stor
 ```
 
 Backing up this directory preserves the local engine registry/profiles and chess database. Engine binaries themselves are not copied into this directory and need to be backed up separately if desired.
+
+## Analysis design notes
+
+The DeepAnalysis move-quality annotation concept, thresholds, architecture, and
+known limitations are documented in
+[`docs/deep-analysis-move-annotations.md`](docs/deep-analysis-move-annotations.md).
 
 ## Development status
 

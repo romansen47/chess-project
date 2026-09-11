@@ -73,17 +73,23 @@ The existing continuation search contributes the current evaluation of the
 position after the played move. Both are combined into a transient
 `DeepAnalysisResult` and passed to `MoveAnnotationClassifier`.
 
-Live annotations are transient:
+Live annotations refine the current analysis profile:
 
-- until the pre-move search has a usable result, the stored DeepAnalysis
-  annotation remains visible;
-- once a live result is ready, it overrides the stored annotation for the
-  selected ply only;
-- a ready live result may also be **no symbol**, temporarily removing the
-  stored symbol;
-- the live symbol may change as search depth grows;
-- disabling Live Evaluation immediately restores the stored DeepAnalysis
-  annotation;
+- until the pre-move search has a usable result, the existing annotation
+  remains visible;
+- once a live result is ready, it replaces the annotation stored for the
+  selected ply in the current analysis session;
+- a ready live result may also be **no symbol**, which permanently clears the
+  previous annotation for that ply in the current session;
+- the stored live result may be replaced again as search depth grows, e.g.
+  `?? -> no symbol -> !!`;
+- disabling Live Evaluation does not restore the former DeepAnalysis
+  annotation; the latest accepted live classification remains in the move list
+  and on the main board;
+- selecting another move and returning to the refined move keeps the latest
+  live classification;
+- starting a new DeepAnalysis creates a fresh analysis profile and therefore
+  recalculates annotations from scratch;
 - temporary analysis variations are excluded from historical-move assessment.
 
 A second engine process is intentional here: it preserves the existing live

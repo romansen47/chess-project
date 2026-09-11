@@ -247,9 +247,20 @@ The previous prototype looked for the worst material balance anywhere in the
 next six plies. That was too broad: an unrelated later exchange could make the
 root move look brilliant.
 
-The current detector instead tracks the **piece moved by the candidate root
+The first material detector tracks the **piece moved by the candidate root
 move**. That exact piece must be captured within the six-ply horizon. Only then
-can the move have a material-investment signal.
+can the move have a causal moved-piece material-investment signal.
+
+A second, complementary detector covers **immediate material offers**. A
+brilliant move can deliberately leave another valuable piece available to be
+captured. Byrne-Fischer 1956 `17...Be6!!` is the reference case: the bishop
+move leaves the queen on b6 available to `Bxb6`. CAT measures the net material
+offered after allowing one immediate material-recovery move. In that position,
+queen 9 minus the recoverable bishop 3 yields a six-point offer.
+
+This distinction is intentional: `3.Nc3` in the same game does not immediately
+offer material, so the later `...Nxc3 bxc3` sequence cannot create a false
+brilliant annotation.
 
 After the tracked piece is captured, CAT allows the sacrificing side one
 immediate reply to recover material. This recovery reply is evaluated even when
@@ -272,6 +283,8 @@ Qxf6 ... forced sequence -> net investment is measured, even when the queen's
 Bxc6 ...dxc6          -> ordinary equal exchange, no signal
 Nc3 ...Nxc3 | bxc3     -> capture at horizon boundary; immediate recovery still
                           counts, no false three-point investment
+...Be6 with queen on b6  -> immediate queen offer can be brilliant even though
+                          the moved bishop itself is not sacrificed
 ...Bxf1 Kxf1          -> material gain for Black, no investment
 ...Rxf7 ...Nxf7       -> net investment 2, recorded but insufficient alone for !!
 e4 ... later Q loss   -> no signal for e4 because the e-pawn was not sacrificed

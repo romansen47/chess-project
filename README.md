@@ -122,6 +122,41 @@ mvn clean install
 
 The frontend remains a normal npm/Vite project internally; Maven invokes `npm ci` and `npm run build` from `chess-frontend` during the backend resource-generation phase.
 
+## Continuous integration and releases
+
+GitHub Actions validates the full Maven reactor, including all submodules and
+the frontend build.
+
+The branch roles are intentional:
+
+- `work` is the active development branch.
+- `master` is the basis for releasable versions.
+
+The CI workflow runs `mvn clean install` on every push to `work` and
+`master`, on pull requests targeting `master`, and when triggered manually
+from GitHub Actions.
+
+A release is created only by pushing a version tag such as `v0.1.0`. The
+release workflow first verifies that the tagged commit is contained in
+`master`, then runs the complete Maven build and tests again. Only after a
+successful build does it create a GitHub Release containing:
+
+- `cat-<tag>.jar` — the packaged Spring Boot application including the
+  frontend;
+- `cat-<tag>.jar.sha256` — SHA-256 checksum for the released JAR.
+
+Typical release sequence:
+
+```bash
+git checkout master
+git pull
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Do not create release tags directly from `work`. The workflow rejects tags
+whose commit is not part of `master`.
+
 ## Running
 
 The packaged application is a Spring Boot application provided by `chess-api`. When running the backend directly during frontend development, the Vite development server proxies `/api` requests to:

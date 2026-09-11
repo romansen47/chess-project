@@ -209,12 +209,9 @@ charged to the original move.
 
 The remaining material deficit relative to the root position is still measured
 for diagnostics, but material alone is considered strong enough to justify
-`!!` only from **4 points** onward.
+`!!` from **3 points** onward.
 
-Smaller investments such as a typical exchange sacrifice (rook for bishop or
-knight, net 2 points) may still be objectively strong and may receive `!` or
-`!!` for other independent reasons, but the material investment by itself no
-longer creates a brilliant annotation.
+A typical exchange sacrifice (rook for bishop or knight, net 2 points) may still be objectively strong and may receive `!` or `!!` for other independent reasons, but the material investment by itself does not create a brilliant annotation. The three-point threshold is deliberately chosen so that the Nezhmetdinov `Qxf6` combination, whose net material investment is 3 despite the much larger gross queen sacrifice, can still qualify through the material signal.
 
 Examples the model is intended to distinguish:
 

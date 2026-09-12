@@ -44,7 +44,7 @@ For a released CAT JAR:
 For building from source, additionally install:
 
 - Maven;
-- Node.js/npm, because the Maven build invokes the frontend build.
+- Node.js **20.19 or newer** and npm, because the Maven build invokes the frontend build. CI and release builds currently pin **Node.js 24.21.0 LTS / npm 11.19.0** for reproducibility.
 
 ### Clone
 

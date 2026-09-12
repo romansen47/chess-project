@@ -31,6 +31,33 @@ CAT is not intended to replace every feature of mature professional suites. Its 
 - Browser UI with English, German, French, Italian, and Spanish localization.
 - Optional runtime debug mode with diagnostic analysis-PGN export.
 
+## Download
+
+Pre-built CAT releases are published on the [GitHub Releases page](https://github.com/romansen47/chess-project/releases).
+
+A release contains:
+
+- `cat-v0.1.0.jar` — executable CAT application;
+- `cat-v0.1.0.jar.sha256` — SHA-256 checksum for the JAR.
+
+Start a downloaded release with:
+
+```bash
+java -jar cat-v0.1.0.jar
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8080
+```
+
+If you build CAT yourself with Maven instead of downloading a release, the executable JAR is created at:
+
+```text
+chess-api/target/chess-app.jar
+```
+
 ## Quick start
 
 ### Requirements

@@ -1,159 +1,129 @@
 # DeepAnalysis move annotations
 
-CAT's move annotations are an experimental analysis feature. Finite
-DeepAnalysis stores annotations for the complete game; analysis-mode Live
-Evaluation can re-classify the currently selected historical move with the same
-classifier. Normal engine play does not use move annotations.
+CAT's move annotations are deterministic chess-domain logic built on finite engine analysis. They are used by completed DeepAnalysis runs and by analysis-mode live reassessment of selected historical moves.
 
-The goal is not to copy one chess site's labels. CAT combines objective engine
-quality with separate signals for moves that are unusually difficult or
-interesting for a human to find.
+The classifier itself never starts an engine. It receives:
+
+- the position before the played move;
+- the played move;
+- the engine's final MultiPV candidates;
+- intermediate depth snapshots from the same search when available;
+- the evaluation of the resulting position.
+
+The frontend only renders the resulting annotation and diagnostic explanation.
+
+## Design goal
+
+CAT does **not** try to imitate a particular chess website's labels and does not attempt to infer an abstract concept such as human genius.
+
+The current model deliberately separates:
+
+1. objective move quality;
+2. extraordinary, explainable properties of an objectively sound move;
+3. critical best-move detection.
+
+The central design rule is:
+
+> A move receives `!!` only when CAT can name a concrete extraordinary property of an objectively sound move.
+
+This means `!!` should be read as **extraordinary / noteworthy**, not as a universal claim that the move is "brilliant."
+
+A higher frequency of `!!` is acceptable when every annotation remains explainable. Explainability is preferred over complicated rarity heuristics.
 
 ## Symbols
 
-- `!` — a critical, non-trivial best move.
-- `!!` — an objectively sound move with strong human-difficulty evidence.
-- `?` — a practical winning-chance loss of at least 10 percentage points relative to the best move.
-- `??` — a practical winning-chance loss of at least 25 percentage points relative to the best move.
+| Symbol | Domain kind | Meaning |
+| --- | --- | --- |
+| `??` | `BLUNDER` | At least 25 percentage points of practical winning chance are lost relative to the best candidate. |
+| `?` | `MISTAKE` | At least 10 percentage points of practical winning chance are lost. |
+| `!!` | `EXTRAORDINARY` | Objectively sound move with qualifying material-sacrifice and/or deep-discovery evidence. |
+| `!` | `ONLY_MOVE` | Critical, non-trivial final best move. |
 
-`!!` is not simply a stronger `!`. A brilliant move may finish at rank 2 or
-3, while `!` requires the final best move.
+A move receives at most one visible symbol.
+
+## Classification order
+
+```text
+MoveAnnotationClassifier
+    |
+    +-- objective loss >= 25 ----------------------> ??
+    |
+    +-- objective loss >= 10 ----------------------> ?
+    |
+    +-- ExtraordinaryMoveDetector -----------------> !!
+    |       |
+    |       +-- MaterialSacrificeDetector
+    |       |
+    |       +-- DeepDiscoveryDetector
+    |
+    +-- final best + critical + non-trivial ------> !
+    |
+    +-- otherwise ---------------------------------> no annotation
+```
+
+Negative quality has priority. A sacrifice, unusual engine discovery, or tactical idea can never turn a move that currently qualifies as `?` or `??` into `!!`.
+
+`!!` is evaluated before `!`. If the final best move is both critical and extraordinary, `!!` is shown.
 
 ## Architecture
 
-The classification is chess-domain logic and lives in the `chess` module.
+The relevant production classes are in:
 
 ```text
-DeepAnalysisUciEngine
-        |
-        v
-DeepAnalysisResult
-  - finalLines
-  - depthHistory
-        |
-        v
-MoveAnnotationClassifier
-  1. objective quality
-  2. human-difficulty evidence
-  3. symbol selection
-        |
-        v
-chess-api DTO mapping
-        |
-        v
-chess-frontend display only
+chess/src/main/java/demo/chess/analysis/annotation/
 ```
 
-### Finite search result
+Current responsibilities:
 
-`DeepAnalysisUciEngine.analyze(...)` returns one immutable
-`DeepAnalysisResult` containing both final variants and intermediate depth
-snapshots from the same search.
+- `MoveAnnotationClassifier` — orchestration and final symbol precedence.
+- `ObjectiveMoveQualityEvaluator` — acceptable / mistake / blunder decision.
+- `ExtraordinaryMoveDetector` — overall `!!` eligibility and evidence combination.
+- `DeepDiscoveryDetector` — detects genuine strengthening of the played move during deeper search.
+- `MaterialSacrificeDetector` — combines active and passive sacrifice evidence.
+- `MaterialInvestmentDetector` — tracks sacrifice of the moved piece itself.
+- `MaterialOfferDetector` — detects new material offers and deliberately declined saves of another piece.
+- `OnlyMoveDetector` — suppresses trivial/obvious `!` annotations.
+- `SearchTimeline` — shared engine-relative depth-window handling.
+- `EvaluationScoring` — mover-centric score normalization, win-percentage conversion, candidate sorting, and root-move matching.
+- `MoveAnnotationPolicy` — all annotation tuning constants.
 
-This replaced the former stateful combination of
-`getBestLines(...)` plus `getLastDepthHistory()`.
-
-### Live move assessment
-
-Analysis-mode Live Evaluation reuses the same chess-core classifier instead of
-implementing a second set of annotation rules.
-
-For a selected historical move, CAT keeps the existing infinite continuation
-analysis of the position **after** the move. In parallel, a second evaluation
-engine process analyzes the position **before** the move using the same runtime
-evaluation profile.
-
-The pre-move search contributes:
-
-- current MultiPV candidates;
-- one immutable snapshot for each completed search depth;
-- the early/middle/late search development used by the brilliance detectors.
-
-The existing continuation search contributes the current evaluation of the
-position after the played move. Both are combined into a transient
-`DeepAnalysisResult` and passed to `MoveAnnotationClassifier`.
-
-Live annotations refine the current analysis profile:
-
-- until the pre-move search has a usable result, the existing annotation
-  remains visible;
-- once a live result is ready, it replaces the annotation stored for the
-  selected ply in the current analysis session;
-- a ready live result may also be **no symbol**, which permanently clears the
-  previous annotation for that ply in the current session;
-- the stored live result may be replaced again as search depth grows, e.g.
-  `?? -> no symbol -> !!`;
-- disabling Live Evaluation does not restore the former DeepAnalysis
-  annotation; the latest accepted live classification remains in the move list
-  and on the main board;
-- selecting another move and returning to the refined move keeps the latest
-  live classification;
-- starting a new DeepAnalysis creates a fresh analysis profile and therefore
-  recalculates annotations from scratch.
-
-Temporary analysis variations use the same live classifier, but deliberately
-have different lifetime semantics:
-
-- only the **latest move of the current variation** is assessed;
-- the annotation is shown only on the main board, on that move's destination
-  square;
-- it is never written into the stored analysis profile or move list;
-- a ready live result with no symbol removes the board badge immediately;
-- deeper live search may set, change or remove the badge again;
-- changing the variation resets the live result before the new move is
-  assessed;
-- leaving the variation discards the variation annotation completely.
-
-A second engine process is intentional here: it preserves the existing live
-continuation view while the pre-move position is assessed independently. Tests
-mock the engine factory and never require a real UCI executable.
-
-### Classifier package
-
-The classifier is in:
-
-```text
-demo.chess.analysis.annotation
-```
-
-Main responsibilities:
-
-- `ObjectiveMoveQualityEvaluator` — classifies the final engine loss as
-  acceptable, mistake, or blunder.
-- `MoveAnnotationClassifier` — orchestrates the three classification layers
-  and selects the visible symbol.
-- `MoveAnnotationPolicy` — central numeric thresholds.
-- `EvaluationScoring` — mover-centric score normalization, winning chances,
-  MultiPV sorting, and root-move matching.
-- `OnlyMoveDetector` — triviality filter for `!`.
-- `BrilliantMoveDetector` — combines independent `!!` signals.
-- `MaterialInvestmentDetector` — verifies that a material sacrifice is tied
-  to the piece moved by the candidate root move.
-
-The API only maps the domain result to DTOs. The frontend only renders badges
-and localized tooltips.
+The API maps the core domain result to a DTO. The frontend does not reimplement the classifier.
 
 ## Score normalization
 
 Engine evaluations are stored from White's point of view.
 
-For candidate ranking:
+Candidate ranking is normalized to the player who made the move:
 
-- White move: higher evaluation is better.
-- Black move: lower White-centric evaluation is better.
+- White mover: higher White evaluation is better.
+- Black mover: lower White evaluation is better.
 
-CAT never trusts MultiPV emission order as quality ranking; candidates are
-sorted by normalized mover score.
+CAT sorts candidate lines itself and does not assume the engine emitted MultiPV lines in final quality order.
 
-For practical thresholds CAT maps evaluation to winning chance using the
-logistic mapping in `EvaluationScoring`.
+### Practical winning chance
 
-## Three-layer classification model
+Raw engine evaluation is converted to practical winning chance by `EvaluationScoring`.
 
-### Layer 1: objective quality
+For mover-centric score `s` in pawns:
 
-The final practical winning-chance loss relative to the best engine candidate
-is calculated first:
+```text
+centipawns = s * 100
+
+winPercent =
+    50
+    + 50 * (
+        2 / (1 + exp(-0.00368208 * centipawns))
+        - 1
+      )
+```
+
+This nonlinear mapping is used for the annotation thresholds.
+
+The important effect is that a large centipawn change in a position that is already overwhelmingly won does not automatically count as an equally large practical error.
+
+## Layer 1: objective quality
+
+The classifier compares the practical winning chance of the best final candidate with the played move:
 
 ```text
 winChanceLoss =
@@ -161,290 +131,446 @@ winChanceLoss =
     - winPercent(played move)
 ```
 
-Current thresholds:
+Current thresholds from `MoveAnnotationPolicy`:
 
-- loss < 10 percentage points: objectively acceptable for annotation purposes;
-- loss >= 10 percentage points: `?`;
-- loss >= 25 percentage points: `??`.
+```text
+MISTAKE_WIN_PERCENT_LOSS = 10.0
+BLUNDER_WIN_PERCENT_LOSS = 25.0
+```
 
-The raw pawn-evaluation difference is deliberately not used for these symbols.
-Near equality, the new thresholds remain close to the old 1-pawn / 3-pawn
-semantics. In a position that is already overwhelmingly won, however, a change
-such as +17.77 to +12.82 represents less than one percentage point of practical
-winning chance and therefore does not become `??`.
+Therefore:
 
-This layer has priority over human-interest signals. A sacrifice or surprising
-idea does **not** turn an objective mistake/blunder into `!!`.
+- loss below 10 -> objectively acceptable for positive annotation purposes;
+- loss from 10 up to 25 -> `?`;
+- loss at or above 25 -> `??`.
 
-When the played move is absent from final MultiPV, CAT falls back to the
-resulting-position evaluation from the following replay point. This compares
-two searches and remains a known approximation.
+If the played move is missing from final MultiPV, the classifier falls back to the evaluation of the resulting position. This necessarily compares values originating from two separate searches and remains an approximation.
 
-### Layer 2: human-difficulty evidence
+## Layer 2A: extraordinary move eligibility
 
-Only objectively acceptable moves can be considered for positive annotations.
+An extraordinary move must first pass the general quality gate in `ExtraordinaryMoveDetector`.
 
-#### `!`: critical but non-trivial best move
+Current requirements:
 
-The played move must be final rank 1.
+```text
+EXTRAORDINARY_MAX_FINAL_RANK = 3
+EXTRAORDINARY_MAX_FINAL_REGRET_WIN_PERCENT = 10.0
+```
 
-Final criticality requires:
-
-- at least two usable candidates;
-- a winning-chance gap of at least **15 percentage points** between rank 1 and
-  rank 2.
-
-A triviality filter then inspects the early search window from **30% to 50% of
-final depth**.
-
-An early snapshot counts as obvious when the played move is already rank 1 and
-leads rank 2 by at least **10 percentage points**. If at least **70%** of usable
-snapshots in that window are obvious, `!` is suppressed. At least two usable
-snapshots are required before suppression.
-
-This is intended to reject obvious forced recaptures and similar moves.
-
-#### `!!`: objective soundness plus brilliance evidence
+The final analysis must contain at least three usable candidates.
 
 The played move must:
 
-- finish in the final **Top 3**;
-- already have passed the objective-quality layer;
-- be within **10 percentage points of practical winning chance** of the final
-  best move.
+- be present in the final Top 3;
+- be no more than 10 percentage points of winning chance behind the final best candidate.
 
-It then needs at least one of the following independent signals.
+After this common gate, CAT checks two independent evidence families:
 
-##### Deep discovery: relative search phases
+1. material sacrifice;
+2. deep discovery.
 
-Deep discovery deliberately uses **relative** phases of the engine's own search
-rather than absolute depth numbers. This matters because a depth value from
-Stockfish is not directly comparable with a depth value from Lc0.
+If both qualify, the reason is `DEEP_DISCOVERY_AND_MATERIAL_SACRIFICE`.
 
-The current phases are:
+### Checks are not special-cased
 
-```text
-early   25-40% of final depth
-middle  45-65% of final depth
-late    75-100% of final depth
-```
+Whether the move gives check is currently diagnostic information only. There is no rule such as "checking moves cannot be extraordinary."
 
-At least two usable snapshots are required in every phase. Phase measurements
-use medians, so one volatile depth does not create a brilliant annotation by
-itself.
+This is intentional. The classifier should not accumulate motif-specific exceptions when the general evidence already explains the annotation.
 
-A deep-discovery `!!` can be produced by either of two independent patterns.
+## Layer 2B: material sacrifice
 
-###### Signal A: rank/regret discovery
-
-A rank change by itself is **not** evidence of brilliance. Opening moves can
-move from rank 4 to rank 2 while all candidate evaluations remain virtually
-identical.
-
-Instead CAT measures **regret**:
+A material-sacrifice `!!` needs:
 
 ```text
-regret = winning chance(best move) - winning chance(played move)
+EXTRAORDINARY_MATERIAL_INVESTMENT = 3.0
+EXTRAORDINARY_MATERIAL_HORIZON_PLIES = 6
+EXTRAORDINARY_MATERIAL_MIN_BEST_WIN_PERCENT = 15.0
 ```
 
-For rank/regret discovery:
+In addition to the common extraordinary gate:
 
-- median early regret must be at least **12 percentage points**;
-- total regret improvement from early to late must be at least
-  **10 percentage points**;
-- regret must improve by at least **3 percentage points** from early to middle;
-- regret must improve by at least **3 percentage points** from middle to late;
-- in the late phase the move must remain Top 3 in at least two of the last
-  three usable snapshots.
+- net investment must be at least 3 material points;
+- the final best line must still give the mover at least 15% practical winning chance.
 
-If the played move is outside the available MultiPV set in a snapshot, the
-worst returned candidate is used as a conservative upper bound for the move's
-score. This yields a lower bound on regret without treating absence/rank alone
-as brilliance.
-
-###### Signal B: strength discovery
-
-Some moves are already plausible candidates early, but the engine only
-discovers **how strong the move itself is** as the search develops. This is
-different from rank/regret discovery: a move may already be rank 1 while its
-practical winning chance rises dramatically.
-
-For strength discovery:
-
-- the move must finish at final **rank 1**;
-- it must be present in at least two snapshots in every search phase;
-- it must be Top 3 in at least **50%** of its usable early snapshots;
-- median practical winning chance must improve by at least
-  **5 percentage points** from early to middle;
-- it must improve by at least another **5 percentage points** from middle to
-  late;
-- total early-to-late improvement must be at least **20 percentage points**;
-- the move must remain rank 1 in at least two of the last three late snapshots.
-
-Winning chance rather than raw centipawns is used intentionally. A change from
-+5 to +10 in an already overwhelmingly won position therefore does not look
-artificially spectacular merely because the centipawn number doubled.
-
-Kramnik-Leko 2004 `...Qd3` is a regression example for this second pattern:
-the move is already a serious candidate at low depth, but its practical
-strength grows dramatically through the middle and late search phases.
-
-##### Signal C: causal material investment
+The 15% floor prevents routine liquidation or desperate material loss in an already practically hopeless position from being promoted to `!!` merely because material disappears.
 
 Material values are:
 
-- pawn = 1
-- knight = 3
-- bishop = 3
-- rook = 5
-- queen = 9
-- king = 0
+| Piece | Value |
+| --- | ---: |
+| Pawn | 1 |
+| Knight | 3 |
+| Bishop | 3 |
+| Rook | 5 |
+| Queen | 9 |
+| King | 0 |
 
-The previous prototype looked for the worst material balance anywhere in the
-next six plies. That was too broad: an unrelated later exchange could make the
-root move look brilliant.
+CAT recognizes three sacrifice shapes.
 
-The first material detector tracks the **piece moved by the candidate root
-move**. That exact piece must be captured within the six-ply horizon. Only then
-can the move have a causal moved-piece material-investment signal.
+### 1. Active investment
 
-A second, complementary detector covers **immediate material offers**. A
-brilliant move can deliberately leave another valuable piece available to be
-captured. Byrne-Fischer 1956 `17...Be6!!` is the reference case: the bishop
-move leaves the queen on b6 available to `Bxb6`. CAT measures the net material
-offered after allowing one immediate material-recovery move. In that position,
-queen 9 minus the recoverable bishop 3 yields a six-point offer.
+`MaterialInvestmentDetector` handles sacrifice of the piece that actually made the root move.
 
-This distinction is intentional: `3.Nc3` in the same game does not immediately
-offer material, so the later `...Nxc3 bxc3` sequence cannot create a false
-brilliant annotation.
+Requirements:
 
-After the tracked piece is captured, CAT allows the sacrificing side one
-immediate reply to recover material. This recovery reply is evaluated even when
-the capture occurred on the final ply of the six-ply detection horizon, so the
-reply itself is the first ply just beyond that horizon. This prevents ordinary
-exchanges at the horizon boundary from being interpreted as sacrifices.
-Additional unrelated loss on that reply is not charged to the original move.
+- replay the candidate engine PV;
+- identify the exact moved piece;
+- that same piece must be captured within the six-ply horizon;
+- measure the mover's material balance before the root move;
+- after capture, allow one immediate reply by the sacrificing side;
+- credit material recovered by that immediate reply;
+- calculate the remaining net deficit.
 
-The remaining material deficit relative to the root position is still measured
-for diagnostics, but material alone is considered strong enough to justify
-`!!` from **3 points** onward.
+The immediate recovery is considered even if the capture occurs on the last ply of the nominal six-ply horizon and the recovery therefore lies one ply beyond it.
 
-A typical exchange sacrifice (rook for bishop or knight, net 2 points) may still be objectively strong and may receive `!` or `!!` for other independent reasons, but the material investment by itself does not create a brilliant annotation. The three-point threshold is deliberately chosen so that the Nezhmetdinov `Qxf6` combination, whose net material investment is 3 despite the much larger gross queen sacrifice, can still qualify through the material signal.
+This avoids false sacrifices from ordinary exchange sequences.
 
-Examples the model is intended to distinguish:
+Promotions are excluded because the pawn object is replaced by the promoted piece and therefore does not fit the identity-tracking model. Kings are excluded.
+
+### 2. New material offer
+
+`MaterialOfferDetector` handles a different piece that becomes capturable because of the root move.
+
+The detector:
+
+1. records material balance before the root move;
+2. applies the root move;
+3. generates legal opponent captures;
+4. ignores capture of the root-moved piece because active investment owns that case;
+5. checks whether another mover piece can now be legally captured;
+6. credits an immediate legal recapture;
+7. calculates net material investment relative to the pre-root balance;
+8. verifies that the offered piece was **not** already legally capturable before the move.
+
+If the piece was newly exposed and the net investment reaches the threshold, the evidence type is:
 
 ```text
-Qxf6 ... forced sequence -> net investment is measured, even when the queen's
-                             gross value is larger
-Bxc6 ...dxc6          -> ordinary equal exchange, no signal
-Nc3 ...Nxc3 | bxc3     -> capture at horizon boundary; immediate recovery still
-                          counts, no false three-point investment
-...Be6 with queen on b6  -> immediate queen offer can be brilliant even though
-                          the moved bishop itself is not sacrificed
-...Bxf1 Kxf1          -> material gain for Black, no investment
-...Rxf7 ...Nxf7       -> net investment 2, recorded but insufficient alone for !!
-e4 ... later Q loss   -> no signal for e4 because the e-pawn was not sacrificed
+NEW_MATERIAL_OFFER
 ```
 
-Promotions are excluded from this identity-based detector because the pawn
-object is replaced by the promoted piece.
+### 3. Declined material save
 
-### Layer 3: symbol selection
+A piece may already be threatened before the root move. CAT only treats leaving it en prise as an intentional sacrifice when the threatened piece itself had at least one legal move to safety.
 
-For one move only one symbol is shown.
+Then the evidence type is:
 
-Current selection order is:
+```text
+DECLINED_MATERIAL_SAVE
+```
 
-1. objective blunder -> `??`
-2. objective mistake -> `?`
-3. objectively acceptable + brilliance evidence -> `!!`
-4. critical non-trivial final best move -> `!`
-5. otherwise no annotation
+If the piece was already unavoidably hanging, playing an unrelated move does **not** earn sacrifice credit.
 
-This means `!!` can override `!`, but can no longer override `?` or `??`.
+This distinction is essential for the Byrne-Fischer reference case `17...Be6!!`: Black deliberately declines to save the queen, and the net material offer after immediate recovery is six points.
 
-## Testing strategy
+### Why net material is measured before the root move
 
-The annotation tests have **no real engine dependency**.
+Passive sacrifice accounting uses the material balance **before** the candidate root move.
+
+This prevents a root move that first wins material from being credited with a sacrifice for giving part of that material back immediately afterwards.
+
+Kramnik-Leko `29.bxc3` is the reference example: `bxc3` itself wins a knight before White's other knight may be lost. The net investment is therefore zero, not three.
+
+## Layer 2C: deep discovery
+
+Deep discovery deliberately has one simple semantic question:
+
+> Does the played move itself become substantially stronger as the same engine search deepens?
+
+The current policy is:
+
+```text
+EXTRAORDINARY_DISCOVERY_EARLY_START_RATIO = 0.25
+EXTRAORDINARY_DISCOVERY_EARLY_END_RATIO = 0.40
+EXTRAORDINARY_DISCOVERY_MIN_EARLY_SNAPSHOTS = 2
+EXTRAORDINARY_DISCOVERY_MIN_EARLY_REGRET_WIN_PERCENT = 1.0
+EXTRAORDINARY_DISCOVERY_MIN_STRENGTH_GAIN_WIN_PERCENT = 20.0
+```
+
+Requirements:
+
+1. the played move must finish at final rank 1;
+2. inspect usable snapshots in the 25-40% relative-depth window;
+3. each usable snapshot must contain at least three candidate lines;
+4. the played move must be present in at least two of those snapshots;
+5. calculate the median early regret;
+6. calculate the median early practical strength of the played move;
+7. early median regret must be at least 1 percentage point;
+8. final strength minus early median strength must be at least 20 percentage points.
+
+Regret is:
+
+```text
+regret =
+    winPercent(best move in snapshot)
+    - winPercent(played move in snapshot)
+```
+
+Strength is simply the played move's own practical winning chance.
+
+The use of **relative depth** is intentional. Stockfish and Lc0 use very different search depth scales; an absolute depth such as 20 is therefore not treated as engine-independent evidence.
+
+### Why the previous phase model was removed
+
+Earlier versions used multiple coupled signals:
+
+- early/middle/late phases;
+- rank movement;
+- regret improvement across phases;
+- stability requirements;
+- Top-3 ratios;
+- phase-step thresholds.
+
+That model could produce false positives when all alternatives deteriorated faster than the played move. Kramnik-Leko `26.Kf2` was the decisive example: it could rise relatively while its own absolute practical strength was actually falling.
+
+The current rule prevents this because the played move's **own strength must increase by at least 20 percentage points**.
+
+### Reference case: Kramnik-Leko `25...Qd3!!`
+
+The current diagnostic PGN showed approximately:
+
+```text
+earlyDepth     = 6
+earlyRank      = 2
+earlyRegret    = 5.26 percentage points
+earlyStrength  = 61.22%
+finalRank      = 1
+finalStrength  = 87.48%
+```
+
+The reason is therefore directly explainable: deeper search substantially increased the strength of `...Qd3` itself.
+
+## Layer 3: critical non-trivial best move
+
+`OnlyMoveDetector` implements `!`.
+
+Final criticality requires:
+
+```text
+ONLY_MOVE_FINAL_WIN_PERCENT_GAP = 15.0
+```
+
+The played move must be final rank 1 and lead final rank 2 by at least 15 percentage points of practical winning chance.
+
+CAT then checks whether the move was already trivial early:
+
+```text
+ONLY_MOVE_TRIVIAL_EARLY_START_RATIO = 0.30
+ONLY_MOVE_TRIVIAL_EARLY_END_RATIO = 0.50
+ONLY_MOVE_TRIVIAL_WIN_PERCENT_GAP = 10.0
+ONLY_MOVE_TRIVIAL_SNAPSHOT_RATIO = 0.70
+ONLY_MOVE_TRIVIAL_MIN_SNAPSHOTS = 2
+```
+
+An early snapshot is "obvious" when:
+
+- the played move is already rank 1;
+- it leads rank 2 by at least 10 percentage points.
+
+If at least 70% of usable snapshots in the 30-50% window are obvious, `!` is suppressed.
+
+At least two usable early snapshots are required before CAT can call the move trivial. If there is insufficient history, triviality is not established.
+
+## SearchTimeline
+
+`SearchTimeline` centralizes relative-depth handling for both `!` and deep-discovery `!!`.
+
+It:
+
+- determines final depth from final lines and depth history;
+- filters unusable snapshots;
+- sorts snapshots by depth;
+- converts relative ranges into actual depth windows.
+
+This keeps engine-relative search semantics in one place and avoids separate depth logic in every detector.
+
+## Finite analysis and live reassessment
+
+### Completed DeepAnalysis
+
+A complete analysis replays the game and stores per-position engine analysis. Move annotations are calculated by the core classifier from that finite data.
+
+### Live evaluation of a historical move
+
+When a user selects a move during completed analysis, CAT can reassess that historical move.
+
+The continuation engine still evaluates the position after the selected move. In parallel, a second evaluation process analyzes the position before the move and supplies current MultiPV/history data to the same `MoveAnnotationClassifier`.
+
+There is no second frontend classification algorithm.
+
+As live search deepens, an annotation may therefore:
+
+- appear;
+- disappear;
+- change.
+
+The latest accepted result remains in the current analysis session.
+
+### Temporary analysis variations
+
+Temporary variations use the same live classifier for the latest variation move, but their annotation is transient and is not written into the stored game-analysis profile.
+
+## Diagnostic PGN and debug mode
+
+The diagnostic analysis-PGN export is intentionally a debug feature.
+
+Start CAT with:
+
+```bash
+java -DdebugMode -jar chess-api/target/chess-app.jar
+```
+
+After a completed analysis, the UI shows **Export analysis PGN**.
+
+Without debug mode, that button is not rendered.
+
+The current export format is:
+
+```text
+AnalysisFormat = ChessAnalysisTool-Diagnostic-v2
+```
+
+The export contains data useful for understanding classifications, including final candidate evaluations, ranks, extraordinary reason, sacrifice evidence, and deep-discovery diagnostics where available.
+
+It is a diagnostic interchange format, not a stable public PGN extension contract.
+
+## Regression testing
+
+The annotation logic has two complementary test layers.
+
+### General classifier tests
 
 ```text
 chess/src/test/java/demo/chess/analysis/annotation/
     MoveAnnotationClassifierTest.java
 ```
 
-Tests build synthetic `EngineLine` and `DeepAnalysisResult` fixtures. CAT's
-own board model is used only when a PV must be replayed for material-sacrifice
-detection. No Stockfish or Lc0 process is started.
+These use small deterministic `EngineLine` and `DeepAnalysisResult` fixtures to test general semantic rules without a real engine process.
 
-Current regression coverage includes:
+### Golden real-game regression tests
 
-- obvious early best move -> no `!`;
-- critical non-trivial best move -> `!`;
-- shuffled MultiPV input order does not affect ranking;
-- close opening rank movement -> no deep-discovery `!!`;
-- large regret reduction across early/middle/late phases -> `!!`;
-- Kramnik-Leko `...Qd3` strength discovery -> `!!`;
-- stable best move with only small strength growth -> no `!!`;
-- sound queen sacrifice -> material `!!`;
-- objectively bad queen sacrifice -> remains `??`;
-- unrelated later material loss -> does not make the root move brilliant;
-- ordinary equal exchange -> no material `!!`;
-- normal development -> no material `!!`;
-- Black score normalization;
-- practical winning-chance thresholds for `?` and `??`;
-- a large raw evaluation drop in an already won position does not automatically become `??`.
+```text
+chess/src/test/java/demo/chess/analysis/annotation/
+    MoveAnnotationGoldenRegressionTest.java
+```
 
-Real games that expose false positives or negatives should become new synthetic
-regression fixtures before thresholds are changed.
+The golden suite is derived from the real Stockfish 19 / depth-15 diagnostic PGNs used to validate the current classifier.
+
+Protected reference cases include:
+
+| Game | Move | Expected result |
+| --- | --- | --- |
+| Kramnik-Leko | `23.Qf2` | `??` |
+| Kramnik-Leko | `24.Qxe2` | no annotation |
+| Kramnik-Leko | `24...Bxe2` | no annotation |
+| Kramnik-Leko | `25...Qd3` | `!!` / deep discovery |
+| Kramnik-Leko | `26.Kf2` | no annotation |
+| Kramnik-Leko | `29.bxc3` | no annotation |
+| Nezhmetdinov-Chernikov | `12.Qxf6` | `!!` / active material sacrifice |
+| Nezhmetdinov-Chernikov | `17...d6` | `?` |
+| Nezhmetdinov-Chernikov | `21...Be2` | `??` |
+| Nezhmetdinov-Chernikov | `23.Rh3` | `??` |
+| Nezhmetdinov-Chernikov | `24...Bxf1` | `?` |
+| Nezhmetdinov-Chernikov | `25.Kxf1` | `?` |
+| Nezhmetdinov-Chernikov | `25...Rc8` | `?` |
+| Nezhmetdinov-Chernikov | `26.Bd4` | `?` |
+| Nezhmetdinov-Chernikov | `29.Rh8+` | `!` |
+| Byrne-Fischer | `11.Bg5` | `?` |
+| Byrne-Fischer | `11...Na4` | `!` |
+| Byrne-Fischer | `17...Be6` | `!!` / declined material save |
+| Byrne-Fischer | `18.Bxb6` | `?` |
+
+These tests intentionally make classifier changes visible during `mvn clean install`.
+
+### Golden-test policy
+
+The source test contains an explicit warning and the project follows the same rule:
+
+> **Do not change a golden expectation merely to make a failing build green.**
+
+When a golden test fails after an annotation change:
+
+1. inspect the exact algorithm change;
+2. inspect the chess position;
+3. compare the original diagnostic engine values;
+4. decide whether the new classification is genuinely better;
+5. only then update the golden expectation if the behavior change is intentional.
+
+A failing golden test should be treated as a review event, not as test maintenance noise.
+
+### Diagnostic-v2 fixture limitation
+
+Diagnostic-v2 does not serialize every raw intermediate engine snapshot.
+
+For `25...Qd3`, the golden test therefore reconstructs the minimum early history from exported values such as `earlyDepth`, `earlyRank`, `earlyRegret`, and `earlyStrength` while keeping the exported final MultiPV evaluations unchanged.
+
+For unannotated moves, raw early history may not exist in the diagnostic PGN. The fixture uses only the minimum information required to preserve the exported semantic result and documents such reconstruction in the test source.
+
+The tests deliberately avoid inventing hidden engine values merely to reproduce a diagnostic number that cannot be derived from the serialized input.
 
 ## Known limitations
 
 ### First move
 
-The initial replay point is still a fixed +0.30 without an engine search.
-Therefore move 1 cannot currently receive an annotation.
+The initial replay point is still not backed by a normal preceding-position engine search in the same way as later moves. Move 1 therefore has limited annotation support.
 
 ### MultiPV availability
 
-Positive annotations require enough usable candidate lines. Time-based searches
-may finish with fewer complete variants than requested.
+Extraordinary classification currently requires at least three usable final candidates.
 
-### Mate scores
+Deep discovery also needs at least three lines in each usable early snapshot.
 
-Mate values are represented by large numeric evaluation values. Annotation
-thresholds are not yet explicitly mate-aware.
+Time-based searches can finish with fewer complete lines than requested, which can suppress positive annotations.
+
+### Mate handling
+
+Mate evaluations use the existing large numeric score representation. Annotation policy is not yet explicitly mate-distance-aware.
 
 ### Engine-specific depth
 
-Depth values are only compared within one search by the same engine. Depth 20
-from one engine is not assumed equivalent to depth 20 from another.
+Relative search depth is only compared inside one search. CAT does not assume that Stockfish depth 20 and Lc0 depth 20 represent equivalent computational effort.
 
-### Material model
+### Material horizon
 
-The material signal is intentionally narrow. It does not attempt to understand
-all tactical motifs, long forced sacrifice chains, piece-square value, king
-safety, or positional compensation. Those remain part of the engine evaluation.
+The active material detector follows the moved piece for six PV plies. A delayed sacrifice accepted beyond that horizon can be missed.
 
-The six-ply identity-tracking horizon is a heuristic and may miss a delayed
-sacrifice whose offered piece is accepted later.
+### Material semantics are intentionally narrow
+
+CAT does not attempt to infer all tactical or positional sacrifice concepts from board geometry.
+
+The material signal intentionally answers concrete questions about net material exposure. Positional compensation, king safety, initiative, piece-square value, and long-term strategic compensation remain represented by the engine evaluation rather than by a separate hand-written heuristic.
 
 ### Standard-start replay
 
-Material replay currently reconstructs positions from the standard starting
-position and move history. Arbitrary FEN roots and future Chess960 support will
-need corresponding replay support.
+Material replay reconstructs the game from the standard initial position and its move history. Arbitrary FEN roots and future Chess960 support require corresponding replay support.
 
 ## Tuning policy
 
-All numeric thresholds belong in:
+All numeric annotation thresholds belong in:
 
 ```text
 chess/src/main/java/demo/chess/analysis/annotation/MoveAnnotationPolicy.java
 ```
 
-Do not scatter tuning constants through detector implementations. Prefer real
-game examples plus deterministic regression fixtures for each semantic change.
+Do not scatter tuning constants through detector implementations.
 
-The annotations remain an experimental model of engine quality plus human
-difficulty, not an objective definition of chess punctuation.
+When behavior is reconsidered:
+
+1. start from real diagnostic examples;
+2. add or update deterministic regression coverage;
+3. prefer a simple semantic rule over motif-specific exceptions;
+4. check the complete golden set;
+5. do not optimize for one isolated move at the expense of model clarity.
+
+The current model is intentionally small:
+
+```text
+objective quality
+    |
+    +-- material sacrifice?
+    |
+    +-- played move itself becomes much stronger with depth?
+    |
+    +-- critical non-trivial best move?
+```
+
+That simplicity is a design constraint, not an accident.

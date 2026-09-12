@@ -387,6 +387,22 @@ The project is composed of several Git submodules:
 
 The application works with UCI-compatible chess engines such as Stockfish and Leela Chess Zero (Lc0).
 
+### Engine download pages
+
+The following engines are commonly used with CAT. Download the build that matches your operating system and CPU/GPU capabilities:
+
+| Engine | Download page |
+| --- | --- |
+| Stockfish | [Official Stockfish downloads](https://stockfishchess.org/download/) |
+| Leela Chess Zero (Lc0) | [Official Lc0 downloads](https://lczero.org/play/download/) |
+| Dragon by Komodo | [Official Komodo/Dragon site](https://komodochess.com/) |
+| Fire | [Fire releases on GitHub](https://github.com/FireFather/fire/releases/latest) |
+| Reckless | [Reckless releases on GitHub](https://github.com/codedeliveryservice/Reckless/releases/latest) |
+
+Dragon/Komodo is a legacy/commercial case: sales were discontinued in 2026. The official site remains the authoritative source for any still-available downloads or access for existing customers.
+
+CAT does not bundle these engines. Each engine remains subject to its own license and distribution terms.
+
 ### Recommended locations
 
 The conventional engine directory for this project is:

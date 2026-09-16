@@ -56,6 +56,7 @@ jobs:
         run: |
           mkdir -p dist
           cp chess-api/target/chess-app.jar "dist/cat-${GITHUB_REF_NAME}.jar"
+          cp LICENSE dist/LICENSE
           (
             cd dist
             sha256sum "cat-${GITHUB_REF_NAME}.jar" > "cat-${GITHUB_REF_NAME}.jar.sha256"
@@ -66,4 +67,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release create "$GITHUB_REF_NAME"             "dist/cat-${GITHUB_REF_NAME}.jar"             "dist/cat-${GITHUB_REF_NAME}.jar.sha256"             --repo "$GITHUB_REPOSITORY"             --verify-tag             --title "CAT $GITHUB_REF_NAME"             --generate-notes
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/cat-${GITHUB_REF_NAME}.jar" \
+            "dist/cat-${GITHUB_REF_NAME}.jar.sha256" \
+            "dist/LICENSE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "CAT $GITHUB_REF_NAME" \
+            --generate-notes

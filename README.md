@@ -38,7 +38,8 @@ Pre-built CAT releases are published on the [GitHub Releases page](https://githu
 A release contains:
 
 - `cat-v0.1.0.jar` — executable CAT application;
-- `cat-v0.1.0.jar.sha256` — SHA-256 checksum for the JAR.
+- `cat-v0.1.0.jar.sha256` — SHA-256 checksum for the JAR;
+- `LICENSE` — Apache License 2.0 for CAT's own source code.
 
 Start a downloaded release with:
 
@@ -530,7 +531,8 @@ CI runs `mvn clean install` on pushes to `work` and `master`, pull requests targ
 A release is created only by pushing a version tag such as `v0.1.0`. The release workflow verifies that the tagged commit belongs to `master`, runs the complete build and tests, and publishes:
 
 - `cat-<tag>.jar`;
-- `cat-<tag>.jar.sha256`.
+- `cat-<tag>.jar.sha256`;
+- `LICENSE`.
 
 Typical release sequence:
 
@@ -552,3 +554,20 @@ The detailed move-annotation design, architecture, thresholds, diagnostics, test
 ## Development status
 
 This project is under active development. Analysis workflows, engine management, database features, localization, and frontend structure may evolve. The golden annotation tests are intentionally conservative: changes to protected move classifications should be treated as review events rather than routine expectation updates.
+
+
+## Architecture documentation
+
+The planned browser-evaluation fallback and the responsibility boundaries around native and browser engines are documented in:
+
+[Browser evaluation fallback design](docs/browser-evaluation-fallback-design.md)
+
+A project-wide architecture review and the identified structural hotspots are documented in:
+
+[Architecture review](docs/architecture-review.md)
+
+## License
+
+CAT's own source code is licensed under the **Apache License, Version 2.0**. See [LICENSE](LICENSE).
+
+Third-party software remains subject to its own license terms. If CAT later distributes Stockfish Lite as a browser fallback, that component will remain separately identified and distributed under GPLv3 together with the corresponding source and license information.

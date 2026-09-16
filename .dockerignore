@@ -1,8 +1,0 @@
-.git
-**/.git
-**/target
-**/node_modules
-chess-frontend/dist
-.idea
-.vscode
-*.log

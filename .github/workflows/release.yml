@@ -54,12 +54,28 @@ jobs:
       - name: Prepare release files
         shell: bash
         run: |
+          set -euo pipefail
+
+          STOCKFISH_VERSION="19.0.0"
+          STOCKFISH_SOURCE_ARCHIVE="stockfish.js-v${STOCKFISH_VERSION}-source.tar.gz"
+          STOCKFISH_SOURCE_URL="https://github.com/nmrugg/stockfish.js/archive/refs/tags/v${STOCKFISH_VERSION}.tar.gz"
+
           mkdir -p dist
           cp chess-api/target/chess-app.jar "dist/cat-${GITHUB_REF_NAME}.jar"
           cp LICENSE dist/LICENSE
+
+          curl --fail --location --retry 3 \
+            --output "dist/${STOCKFISH_SOURCE_ARCHIVE}" \
+            "${STOCKFISH_SOURCE_URL}"
+
+          # Fail the release before publication if the mirrored source archive
+          # is not a readable tar.gz file.
+          tar -tzf "dist/${STOCKFISH_SOURCE_ARCHIVE}" >/dev/null
+
           (
             cd dist
             sha256sum "cat-${GITHUB_REF_NAME}.jar" > "cat-${GITHUB_REF_NAME}.jar.sha256"
+            sha256sum "${STOCKFISH_SOURCE_ARCHIVE}" > "${STOCKFISH_SOURCE_ARCHIVE}.sha256"
           )
 
       - name: Create GitHub release
@@ -70,6 +86,8 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             "dist/cat-${GITHUB_REF_NAME}.jar" \
             "dist/cat-${GITHUB_REF_NAME}.jar.sha256" \
+            "dist/stockfish.js-v19.0.0-source.tar.gz" \
+            "dist/stockfish.js-v19.0.0-source.tar.gz.sha256" \
             "dist/LICENSE" \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \

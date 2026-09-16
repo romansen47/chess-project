@@ -21,7 +21,7 @@ CAT is not intended to replace every feature of mature professional suites. Its 
 ## Highlights
 
 - Interactive board with legal move handling and game clocks.
-- Live engine evaluation with principal variations.
+- Live engine evaluation with principal variations and an automatic bundled Stockfish.js 19 Lite browser fallback when native live evaluation is unavailable.
 - Deeper replay analysis of complete games.
 - Explainable move annotations: `!`, `!!`, `?`, and `??`.
 - Configurable UCI engines and reusable engine profiles.
@@ -37,14 +37,16 @@ Pre-built CAT releases are published on the [GitHub Releases page](https://githu
 
 A release contains:
 
-- `cat-v0.1.0.jar` — executable CAT application;
-- `cat-v0.1.0.jar.sha256` — SHA-256 checksum for the JAR;
+- `cat-<tag>.jar` — executable CAT application;
+- `cat-<tag>.jar.sha256` — SHA-256 checksum for the JAR;
+- `stockfish.js-v19.0.0-source.tar.gz` — corresponding source archive for the bundled Stockfish.js 19.0.0 browser fallback;
+- `stockfish.js-v19.0.0-source.tar.gz.sha256` — SHA-256 checksum for that source archive;
 - `LICENSE` — Apache License 2.0 for CAT's own source code.
 
-Start a downloaded release with:
+For example, release `v0.3.0` is started with:
 
 ```bash
-java -jar cat-v0.1.0.jar
+java -jar cat-v0.3.0.jar
 ```
 
 Then open:
@@ -67,7 +69,9 @@ For a released CAT JAR:
 
 - Java 21;
 - a modern web browser;
-- at least one local UCI engine if engine analysis or computer play is required.
+- a local UCI engine only when native-engine features such as computer play or deep game analysis are required.
+
+Live evaluation can fall back automatically to the bundled single-threaded Stockfish.js 19 Lite browser engine when no usable native live-evaluation engine is available.
 
 For building from source, additionally install:
 
@@ -122,10 +126,10 @@ http://127.0.0.1:8080
 A released artifact can be started in the same way, for example:
 
 ```bash
-java -jar cat-v0.1.0.jar
+java -jar cat-v0.3.0.jar
 ```
 
-Engine executables run as child processes of CAT. The user running the Java process must therefore have permission to execute the configured engines and read their companion files.
+Configured native engine executables run as child processes of CAT. The user running the Java process must therefore have permission to execute those engines and read their companion files. The bundled browser fallback is separate and runs in the browser only for live evaluation.
 
 ### Debug mode
 
@@ -154,6 +158,8 @@ The JVM property must appear **before** `-jar`.
 The only debug-only UI function at present is **Export analysis PGN**. It becomes available after a completed game analysis and exports the engine diagnostics used to understand and regression-test CAT's annotations.
 
 ## First-time setup
+
+Native-engine setup is optional if only the browser live-evaluation fallback is needed. Computer play and deep game analysis still require an appropriate local UCI engine and profile.
 
 ### 1. Configure UCI engines
 
@@ -413,7 +419,7 @@ The project is composed of several Git submodules:
 
 ## UCI engines
 
-The application works with UCI-compatible chess engines such as Stockfish and Leela Chess Zero (Lc0).
+The application works with local UCI-compatible chess engines such as Stockfish and Leela Chess Zero (Lc0). For live evaluation only, CAT also bundles an unmodified Stockfish.js 19.0.0 Lite single-threaded browser engine as an automatic fallback.
 
 ### Engine download pages
 
@@ -429,7 +435,7 @@ The following engines are commonly used with CAT. Download the build that matche
 
 Dragon/Komodo is a legacy/commercial case: sales were discontinued in 2026. The official site remains the authoritative source for any still-available downloads or access for existing customers.
 
-CAT does not bundle these engines. Each engine remains subject to its own license and distribution terms.
+CAT does not bundle the native engines listed above. Each native engine remains subject to its own license and distribution terms. The browser live-evaluation fallback is the exception: CAT bundles Stockfish.js 19.0.0 Lite separately under GNU GPL v3, with its license, provenance metadata, checksums, and corresponding source information.
 
 ### Recommended locations
 
@@ -528,19 +534,23 @@ Branch roles:
 
 CI runs `mvn clean install` on pushes to `work` and `master`, pull requests targeting `master`, and manual workflow runs.
 
-A release is created only by pushing a version tag such as `v0.1.0`. The release workflow verifies that the tagged commit belongs to `master`, runs the complete build and tests, and publishes:
+A release is created only by pushing a version tag such as `v0.3.0`. The release workflow verifies that the tagged commit belongs to `master`, runs the complete build and tests, and publishes:
 
 - `cat-<tag>.jar`;
 - `cat-<tag>.jar.sha256`;
+- `stockfish.js-v19.0.0-source.tar.gz`;
+- `stockfish.js-v19.0.0-source.tar.gz.sha256`;
 - `LICENSE`.
+
+The Stockfish source archive mirrors the exact upstream source release corresponding to the browser engine distributed inside CAT.
 
 Typical release sequence:
 
 ```bash
 git checkout master
 git pull
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 Do not create release tags directly from `work`.
@@ -558,7 +568,7 @@ This project is under active development. Analysis workflows, engine management,
 
 ## Architecture documentation
 
-The planned browser-evaluation fallback and the responsibility boundaries around native and browser engines are documented in:
+The implemented browser-evaluation fallback and the responsibility boundaries around native and browser engines are documented in:
 
 [Browser evaluation fallback design](docs/browser-evaluation-fallback-design.md)
 
@@ -570,4 +580,4 @@ A project-wide architecture review and the identified structural hotspots are do
 
 CAT's own source code is licensed under the **Apache License, Version 2.0**. See [LICENSE](LICENSE).
 
-Third-party software remains subject to its own license terms. If CAT later distributes Stockfish Lite as a browser fallback, that component will remain separately identified and distributed under GPLv3 together with the corresponding source and license information.
+Third-party software remains subject to its own license terms. CAT distributes the unmodified Stockfish.js 19.0.0 Lite single-threaded browser engine separately under GNU GPL v3. Its GPL text, upstream provenance, exact source commit, and binary checksums are kept under `chess-frontend/public/third-party/stockfish/19.0.0/`; CAT releases also publish the corresponding upstream source archive as a separate release asset.

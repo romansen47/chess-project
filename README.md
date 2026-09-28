@@ -566,6 +566,13 @@ The detailed move-annotation design, architecture, thresholds, diagnostics, test
 This project is under active development. Analysis workflows, engine management, database features, localization, and frontend structure may evolve. The golden annotation tests are intentionally conservative: changes to protected move classifications should be treated as review events rather than routine expectation updates.
 
 
+## Imported comments and clocks
+
+PGN library imports preserve comments and clock annotations. Historical clocks
+follow the selected analysis move, and the mobile Moves tab includes its comment.
+See [imported comments and clock times](docs/pgn-annotations-and-clocks.md) for
+reimport rules and validation steps.
+
 ## Architecture documentation
 
 The implemented browser-evaluation fallback and the responsibility boundaries around native and browser engines are documented in:

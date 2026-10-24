@@ -367,12 +367,12 @@ This deliberately avoids the former problem where a move looked special merely b
 Requirements:
 
 - the move finishes at **rank 1**;
-- early data is taken from **25–40% of that engine search's final depth**;
+- early data is taken from the fixed shallow window **depth 5–8**;
 - at least **2** usable early snapshots are required;
 - the median early regret must be at least **1 percentage point**;
 - the move's own practical strength must increase by at least **20 percentage points** from the early median to the final result.
 
-The depth window is relative rather than absolute. This matters because Stockfish and Lc0 have very different depth scales.
+The discovery window is deliberately **independent of final search depth and thinking time**. It is meant to approximate whether a move is already apparent to a shallow search, which is closer to the human-facing meaning of the annotation than asking what fraction of a long engine search has elapsed. Engine depth is not perfectly comparable across engine families, so this remains a heuristic; importantly, however, giving the same engine 30 seconds instead of a depth-15 limit no longer moves the definition of "early".
 
 Kramnik–Leko `25...Qd3!!` is the key regression example: the move starts as a serious but not yet obvious candidate and becomes dramatically stronger with deeper search.
 
@@ -390,6 +390,9 @@ CAT suppresses `!` when the move was already trivially obvious early in the sear
 - if at least **70%** of the usable early snapshots are obvious, `!` is suppressed.
 
 Because `!!` is evaluated before `!`, a best move that also has a qualifying extraordinary property receives `!!`.
+
+
+Diagnostic PGN exports use `ChessAnalysisTool-Diagnostic-v3`. Besides positive annotations they now also serialize rejected deep-discovery candidates, including the fixed early window, usable sample count, early/final rank and strength, strength gain, and a rejection reason such as `earlyRegretTooSmall`, `strengthGainTooSmall`, or `insufficientEarlySnapshots`. This makes "why was this best move not marked !!?" directly inspectable without rerunning the classifier by hand.
 
 ### Regression protection
 

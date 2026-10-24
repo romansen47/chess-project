@@ -83,7 +83,7 @@ Current responsibilities:
 - `MaterialInvestmentDetector` — tracks sacrifice of the moved piece itself.
 - `MaterialOfferDetector` — detects new material offers and deliberately declined saves of another piece.
 - `OnlyMoveDetector` — suppresses trivial/obvious `!` annotations.
-- `SearchTimeline` — shared engine-relative depth-window handling.
+- `SearchTimeline` — shared fixed and relative depth-window handling.
 - `EvaluationScoring` — mover-centric score normalization, win-percentage conversion, candidate sorting, and root-move matching.
 - `MoveAnnotationPolicy` — all annotation tuning constants.
 
@@ -279,8 +279,8 @@ Deep discovery deliberately has one simple semantic question:
 The current policy is:
 
 ```text
-EXTRAORDINARY_DISCOVERY_EARLY_START_RATIO = 0.25
-EXTRAORDINARY_DISCOVERY_EARLY_END_RATIO = 0.40
+EXTRAORDINARY_DISCOVERY_EARLY_START_DEPTH = 5
+EXTRAORDINARY_DISCOVERY_EARLY_END_DEPTH = 8
 EXTRAORDINARY_DISCOVERY_MIN_EARLY_SNAPSHOTS = 2
 EXTRAORDINARY_DISCOVERY_MIN_EARLY_REGRET_WIN_PERCENT = 1.0
 EXTRAORDINARY_DISCOVERY_MIN_STRENGTH_GAIN_WIN_PERCENT = 20.0
@@ -289,7 +289,7 @@ EXTRAORDINARY_DISCOVERY_MIN_STRENGTH_GAIN_WIN_PERCENT = 20.0
 Requirements:
 
 1. the played move must finish at final rank 1;
-2. inspect usable snapshots in the 25-40% relative-depth window;
+2. inspect usable snapshots in the fixed depth-5-to-8 window;
 3. each usable snapshot must contain at least three candidate lines;
 4. the played move must be present in at least two of those snapshots;
 5. calculate the median early regret;
@@ -307,7 +307,34 @@ regret =
 
 Strength is simply the played move's own practical winning chance.
 
-The use of **relative depth** is intentional. Stockfish and Lc0 use very different search depth scales; an absolute depth such as 20 is therefore not treated as engine-independent evidence.
+The fixed shallow window is intentional because the annotation is human-facing: increasing the engine's final depth or thinking time must not move the definition of "early." Depth 5–8 is shallow enough to represent initial discoverability while avoiding the most volatile depth-1-to-4 output.
+
+Engine depth is still not a universal unit—Stockfish, Lc0 and other engines can attach different meaning to the same numeric depth—so this remains an engine-relative heuristic in that broader sense. The key invariant is narrower and deliberate: **for the same engine, the early window no longer changes just because the final search runs longer.**
+
+
+### Rejected-candidate diagnostics
+
+`MoveAnnotationClassifier.assess(...)` returns the normal annotation together with optional diagnostic evidence. The existing `classify(...)` API delegates to it and remains backward-compatible.
+
+For a sound final rank-1 move, the deep-discovery detector records:
+
+- fixed early window start/end;
+- number of usable early snapshots;
+- representative early depth and rank;
+- median early regret and practical strength;
+- final depth, rank and practical strength;
+- strength gain;
+- a rejection reason when the deep-discovery signal fails.
+
+Current rejection reasons are:
+
+```text
+insufficientEarlySnapshots
+earlyRegretTooSmall
+strengthGainTooSmall
+```
+
+The debug export format is `ChessAnalysisTool-Diagnostic-v3`. Rejected candidates are exported even when the move receives no visible annotation, so cases such as Kramnik–Leko `25...Qd3` can be diagnosed directly from the PGN.
 
 ### Why the previous phase model was removed
 

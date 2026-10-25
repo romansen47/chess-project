@@ -57,7 +57,23 @@ jobs:
               echo "::error::Missing JaCoCo report for $module"
               exit 1
             fi
-            awk -F, -v module="$module" '
+
+            case "$module" in
+              chess)
+                min_line=74
+                min_branch=62
+                ;;
+              chess-database)
+                min_line=87
+                min_branch=64
+                ;;
+              chess-api)
+                min_line=54
+                min_branch=44
+                ;;
+            esac
+
+            awk -F, -v module="$module" -v min_line="$min_line" -v min_branch="$min_branch" '
               NR > 1 {
                 line_missed += $8
                 line_covered += $9
@@ -72,6 +88,11 @@ jobs:
                 printf "%s: line coverage %.2f%% (%d/%d), branch coverage %.2f%% (%d/%d)\n",
                   module, line_pct, line_covered, line_total,
                   branch_pct, branch_covered, branch_total
+                if (line_pct < min_line || branch_pct < min_branch) {
+                  printf "Coverage regression in %s: required line >= %.2f%% and branch >= %.2f%%\n",
+                    module, min_line, min_branch > "/dev/stderr"
+                  exit 2
+                }
               }
             ' "$report"
           done

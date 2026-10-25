@@ -63,11 +63,11 @@ while read -r key submodule_path; do
 
     submodule_name="${key#submodule.}"
     submodule_name="${submodule_name%.path}"
-    submodule_branch="$(git config --file .gitmodules --get "submodule.${submodule_name}.branch" || true)"
 
-    if [[ -z "$submodule_branch" ]]; then
-        submodule_branch="$PARENT_BRANCH"
-    fi
+    # Development follows the parent branch, not .gitmodules' branch hint.
+    # .gitmodules may keep "master" as the release/default remote-tracking hint,
+    # but a work-tree update must never push submodule development to master.
+    submodule_branch="$PARENT_BRANCH"
 
     echo "------------------------------------------------------------"
     echo "Submodule: $submodule_path"
@@ -79,10 +79,15 @@ while read -r key submodule_path; do
         exit 1
     fi
 
-    check_branch "$submodule_path" "$submodule_path" "$submodule_branch"
-
     echo "Fetching origin..."
     git -C "$submodule_path" fetch origin
+
+    if ! git -C "$submodule_path" show-ref --verify --quiet "refs/remotes/origin/$submodule_branch"; then
+        echo "ERROR: Remote branch origin/$submodule_branch does not exist for $submodule_path."
+        exit 1
+    fi
+
+    check_branch "$submodule_path" "$submodule_path" "$submodule_branch"
 
     echo "Staging changes..."
     git -C "$submodule_path" add -A

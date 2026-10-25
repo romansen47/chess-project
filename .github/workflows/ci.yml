@@ -46,3 +46,31 @@ jobs:
 
       - name: Build and test
         run: mvn -B -ntp clean install
+
+      - name: Report Java coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          for module in chess chess-database chess-api; do
+            report="$module/target/site/jacoco/jacoco.csv"
+            if [[ ! -f "$report" ]]; then
+              echo "::error::Missing JaCoCo report for $module"
+              exit 1
+            fi
+            awk -F, -v module="$module" '
+              NR > 1 {
+                line_missed += $8
+                line_covered += $9
+                branch_missed += $6
+                branch_covered += $7
+              }
+              END {
+                line_total = line_missed + line_covered
+                branch_total = branch_missed + branch_covered
+                line_pct = line_total ? (100.0 * line_covered / line_total) : 100.0
+                branch_pct = branch_total ? (100.0 * branch_covered / branch_total) : 100.0
+                printf "%s: line coverage %.2f%% (%d/%d), branch coverage %.2f%% (%d/%d)\n",
+                  module, line_pct, line_covered, line_total,
+                  branch_pct, branch_covered, branch_total
+              }
+            ' "$report"

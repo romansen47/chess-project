@@ -74,3 +74,4 @@ jobs:
                   branch_pct, branch_covered, branch_total
               }
             ' "$report"
+          done

@@ -44,6 +44,9 @@ jobs:
           cache: npm
           cache-dependency-path: chess-frontend/package-lock.json
 
+      - name: Enforce source-file size limit
+        run: bash scripts/check-source-size.sh
+
       - name: Build and test
         run: mvn -B -ntp clean install
 

@@ -291,18 +291,23 @@ played move
     |
     +-- winning-chance loss >= 10? ----------------------> ?
     |
-    +-- objectively sound + extraordinary evidence? ----> !!
+    +-- stable in the human depth horizon? --------------> no: no positive symbol
     |
-    +-- critical non-trivial final best move? ----------> !
+    +-- sound + extraordinary, not merely routine? ------> !!
+    |
+    +-- critical non-trivial best move? -----------------> !
     |
     +-- otherwise ---------------------------------------> no symbol
 ```
 
 This ordering is important: a tactical idea or sacrifice cannot turn an objective mistake or blunder into `!!`.
 
+The concise domain specification, including component responsibilities and
+regression guarantees, lives in `chess/ANNOTATION_MODEL.md`.
+
 ### Practical winning chance
 
-Engine scores are stored from White's point of view, then normalized to the player who made the move. Candidate moves are sorted from that mover's point of view.
+Engine scores are stored from White's point of view, then normalized to the player who made the move. Candidate moves retain the engine's authoritative MultiPV order; displayed numeric scores are not used to reorder them. This matters especially for WDL-based engines such as Leela, whose separately searched PV scores need not be strictly monotonic.
 
 For annotation thresholds, CAT converts the engine evaluation into a practical winning-chance percentage with the logistic mapping implemented by `EvaluationScoring`. This prevents very large centipawn swings in positions that are already overwhelmingly won from automatically looking like equally large practical errors.
 
@@ -323,15 +328,35 @@ Current thresholds:
 
 These objective negative annotations are evaluated before any positive annotation.
 
+### Human decision horizon and routine moves
+
+Positive symbols describe what a human could plausibly discover, rather than
+allowing unlimited engine depth to redefine the annotation indefinitely.
+Searches ending at depth 20 or below use their final result. Deeper searches
+require at least three usable snapshots between depths 16 and 20, with the move
+qualifying in at least 70% of them. A deeper objective refutation can still
+veto praise, but a later rank fluctuation alone cannot remove a stable positive
+assessment.
+
+CAT also suppresses positive symbols for mechanically natural moves:
+
+- the only legal move;
+- a safe retreat by a piece newly attacked by the preceding move;
+- an immediate equal-value recapture.
+
+Promotions, castling and checking moves are not classified as routine by these
+rules. A genuine material sacrifice can also override routine suppression.
+
 ### `!!`: extraordinary move
 
 CAT no longer tries to infer an abstract notion of "brilliance." A `!!` must be objectively sound and must have one of two explainable properties.
 
-Before either property can qualify, the move must:
+At the stable human decision point, either property can qualify only when the
+move:
 
-- finish in the final **Top 3**;
-- be within **10 percentage points** of the final best move;
-- have at least three usable final candidates.
+- is in the **Top 3**;
+- is within **10 percentage points** of the best move;
+- has at least three usable candidates.
 
 A material-sacrifice `!!` additionally requires that the final best line still gives the mover at least **15% practical winning chance**.
 
@@ -366,7 +391,7 @@ This deliberately avoids the former problem where a move looked special merely b
 
 Requirements:
 
-- the move finishes at **rank 1**;
+- the move is **rank 1** at the human decision point;
 - early data is taken from the fixed shallow window **depth 5–8**;
 - at least **2** usable early snapshots are required;
 - the median early regret must be at least **1 percentage point**;
@@ -380,7 +405,7 @@ A move that merely rises in relative rank while its own evaluation deteriorates 
 
 ### `!`: critical non-trivial best move
 
-A `!` must be the final rank-1 move and lead rank 2 by at least **15 percentage points** of winning chance.
+A `!` must be rank 1 at the stable human decision point and lead rank 2 by at least **15 percentage points** of winning chance.
 
 CAT suppresses `!` when the move was already trivially obvious early in the search:
 

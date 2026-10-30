@@ -1,11 +1,11 @@
-# Browser evaluation fallback design
+# Browser live-evaluation design
 
-Status: **Draft**  
+Status: **Implemented**
 Scope: live evaluation only
 
 ## 1. Goal
 
-CAT shall remain fully usable when no native UCI engine is installed. Live evaluation may then use a bundled, lightweight Stockfish Lite WebAssembly engine in the browser.
+CAT shall keep live evaluation independent from native backend engines. A bundled, lightweight Stockfish Lite WebAssembly engine runs on the browser device by default, while a configured native backend profile remains selectable.
 
 This is not a replacement for CAT's native engine architecture. Native engines remain the authoritative implementation for computer play, deep analysis and complete-game analysis.
 
@@ -197,21 +197,23 @@ User enables live evaluation
               |
               v
      LiveEvaluationController
-              |
-              v
- native backend evaluation available?
-        /                 \
-      yes                  no
-       |                    |
-       v                    v
- Backend source       Browser source
+        /                     \
+ browser selected       backend selected
+       |                       |
+       v                       v
+ Browser source       backend available?
+                         /          \
+                       yes           no
+                        |             |
+                        v             v
+                  Backend source  Browser fallback
 ```
 
 A defined `ENGINE_UNAVAILABLE` result from the backend may trigger the same fallback.
 
 Other errors do not. HTTP failures, malformed responses and programming errors remain visible errors.
 
-Source selection belongs to the controller/coordinator, not to either source implementation.
+Source selection belongs to the controller/coordinator, not to either source implementation. The choice is stored in browser-local UI preferences, so two clients connected to the same backend may intentionally use different evaluation locations. Browser Stockfish is a fixed built-in choice and is never persisted as a backend engine or profile id.
 
 ## 7. Startup and lazy loading
 

@@ -21,7 +21,7 @@ CAT is not intended to replace every feature of mature professional suites. Its 
 ## Highlights
 
 - Interactive board with legal move handling and game clocks.
-- Live engine evaluation with principal variations and an automatic bundled Stockfish.js 19 Lite browser fallback when native live evaluation is unavailable.
+- Live engine evaluation with principal variations and a selectable bundled Stockfish.js 19 Lite engine that runs on the browser device by default.
 - Deeper replay analysis of complete games.
 - Explainable move annotations: `!`, `!!`, `?`, and `??`.
 - Configurable UCI engines and reusable engine profiles.
@@ -71,7 +71,7 @@ For a released CAT JAR:
 - a modern web browser;
 - a local UCI engine only when native-engine features such as computer play or deep game analysis are required.
 
-Live evaluation can fall back automatically to the bundled single-threaded Stockfish.js 19 Lite browser engine when no usable native live-evaluation engine is available.
+Live evaluation uses the bundled single-threaded Stockfish.js 19 Lite browser engine by default. The evaluation-bar context menu and Engine Settings can select a native backend profile instead; unavailable backend evaluation still falls back safely to the browser engine.
 
 For building from source, additionally install:
 
@@ -159,7 +159,7 @@ The only debug-only UI function at present is **Export analysis PGN**. It become
 
 ## First-time setup
 
-Native-engine setup is optional if only the browser live-evaluation fallback is needed. Computer play and deep game analysis still require an appropriate local UCI engine and profile.
+Native-engine setup is optional if only browser live evaluation is needed. Computer play and deep game analysis still require an appropriate backend UCI engine and profile.
 
 ### 1. Configure UCI engines
 
@@ -467,7 +467,7 @@ The project is composed of several Git submodules:
 
 ## UCI engines
 
-The application works with local UCI-compatible chess engines such as Stockfish and Leela Chess Zero (Lc0). For live evaluation only, CAT also bundles an unmodified Stockfish.js 19.0.0 Lite single-threaded browser engine as an automatic fallback.
+The application works with backend UCI-compatible chess engines such as Stockfish and Leela Chess Zero (Lc0). For live evaluation only, CAT also bundles an unmodified Stockfish.js 19.0.0 Lite single-threaded browser engine. It is the local per-browser default and can be replaced by a configured backend profile at any time.
 
 ### Engine download pages
 
@@ -483,7 +483,7 @@ The following engines are commonly used with CAT. Download the build that matche
 
 Dragon/Komodo is a legacy/commercial case: sales were discontinued in 2026. The official site remains the authoritative source for any still-available downloads or access for existing customers.
 
-CAT does not bundle the native engines listed above. Each native engine remains subject to its own license and distribution terms. The browser live-evaluation fallback is the exception: CAT bundles Stockfish.js 19.0.0 Lite separately under GNU GPL v3, with its license, provenance metadata, checksums, and corresponding source information.
+CAT does not bundle the native engines listed above. Each native engine remains subject to its own license and distribution terms. The browser live-evaluation engine is the exception: CAT bundles Stockfish.js 19.0.0 Lite separately under GNU GPL v3, with its license, provenance metadata, checksums, and corresponding source information.
 
 ### Recommended locations
 
@@ -623,9 +623,9 @@ reimport rules and validation steps.
 
 ## Architecture documentation
 
-The implemented browser-evaluation fallback and the responsibility boundaries around native and browser engines are documented in:
+The selectable browser evaluation and the responsibility boundaries around native and browser engines are documented in:
 
-[Browser evaluation fallback design](docs/browser-evaluation-fallback-design.md)
+[Browser live-evaluation design](docs/browser-evaluation-fallback-design.md)
 
 A project-wide architecture review and the identified structural hotspots are documented in:
 

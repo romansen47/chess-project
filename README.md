@@ -207,7 +207,11 @@ The analysis dialog still allows the analysis profile to be selected explicitly 
 7. Start the analysis and wait for the complete game replay.
 8. After completion, inspect the move list, annotations, engine variations, evaluation, and database continuations.
 
-A running analysis can be cancelled. A completed analysis can be run again with different settings.
+A running analysis shows the active engine's UCI communication directly below
+the evaluation history. The protocol window is available only while Deep
+Analysis is running and disappears when the replay completes or is cancelled.
+A running analysis can be cancelled. A completed analysis can be run again
+with different settings.
 
 Selecting a move in a completed analysis opens the stored analysis for that position. Live evaluation can refine the currently selected historical move with the same annotation classifier used by the finite analysis.
 
@@ -262,6 +266,22 @@ The database workflow supports:
 - querying position statistics and continuations.
 
 Large PGN collections may take many minutes or several hours to import because CAT parses games, replays positions, checks duplicates, builds position statistics, and writes them to SQLite.
+
+### Opening catalog
+
+CAT ships with a pinned snapshot of `lichess-org/chess-openings`. During
+backend startup, missing catalog entries are installed idempotently from the
+JAR's bundled PGN resource. Runtime startup never downloads data and therefore
+does not depend on GitHub, Lichess or general network availability.
+
+The catalog is licensed under CC0 / public-domain dedication. Source,
+revision, transformation and licensing details are recorded in
+[Lichess opening catalog](docs/lichess-opening-catalog.md) and in the JAR's
+`META-INF/THIRD-PARTY-NOTICES.txt`.
+
+The application does not expose an opening-PGN upload or a manual Lichess
+catalog import. Catalog updates are reviewed and shipped as part of a CAT
+release.
 
 ### Engine Manager
 

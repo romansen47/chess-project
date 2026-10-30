@@ -1,0 +1,5 @@
+{
+  "whitePlayerProfileId": "white-fast",
+  "blackPlayerProfileId": null,
+  "evaluationProfileId": "browser-fallback"
+}

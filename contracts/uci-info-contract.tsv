@@ -1,0 +1,8 @@
+name	usable	depth	multipv	cp	mate	pv	whiteEval	blackEval	mateDistance	line
+centipawn	true	18	1	125	-	e2e4 e7e5	1.25	-1.25	-	info depth 18 multipv 1 score cp 125 nodes 100 pv e2e4 e7e5
+negative-mate	true	22	1	-	-4	h7h8q e1e2	-99	99	4	info depth 22 score mate -4 pv h7h8q e1e2
+mate-zero	false	12	1	-	0	d2d4	-	-	-	info depth 12 score mate 0 pv d2d4
+bounded-score	false	18	1	31	-	e2e4 e7e5	-	-	-	info depth 18 score cp 31 lowerbound pv e2e4 e7e5
+malformed-depth	false	-	-	-	-	-	-	-	-	info depth many score cp 20 pv e2e4
+missing-pv	false	10	1	10	-	-	-	-	-	info depth 10 score cp 10
+diagnostic	false	-	-	-	-	-	-	-	-	info string hash table initialized

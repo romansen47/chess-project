@@ -50,6 +50,10 @@ jobs:
       - name: Build and test
         run: mvn -B -ntp clean install
 
+      - name: Enforce frontend orchestration coverage
+        working-directory: chess-frontend
+        run: npm run test:coverage
+
       - name: Report Java coverage
         shell: bash
         run: |

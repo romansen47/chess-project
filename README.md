@@ -71,7 +71,7 @@ For a released CAT JAR:
 - a modern web browser;
 - a local UCI engine only when native-engine features such as computer play or deep game analysis are required.
 
-Live evaluation uses the bundled single-threaded Stockfish.js 19 Lite browser engine by default. The evaluation-bar context menu and Engine Settings can select a native backend profile instead; unavailable backend evaluation still falls back safely to the browser engine.
+Live evaluation uses the bundled single-threaded Stockfish.js 19 Lite browser engine by default. The evaluation-bar context menu can select a native backend profile instead; unavailable backend evaluation still falls back safely to the browser engine.
 
 For building from source, additionally install:
 

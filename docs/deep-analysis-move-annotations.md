@@ -81,6 +81,7 @@ Current responsibilities:
 - `DeepDiscoveryDetector` — detects genuine strengthening of the played move during deeper search.
 - `MaterialSacrificeDetector` — combines active and passive sacrifice evidence.
 - `MaterialInvestmentDetector` — tracks sacrifice of the moved piece itself.
+- `MaterialTrajectoryAnalyzer` — replays the selected PV once and identifies the causal closure of an active exchange.
 - `MaterialOfferDetector` — detects new material offers and deliberately declined saves of another piece.
 - `OnlyMoveDetector` — suppresses trivial/obvious `!` annotations.
 - `SearchTimeline` — shared fixed and relative depth-window handling.
@@ -219,11 +220,18 @@ Requirements:
 - measure the mover's material balance before the root move;
 - after capture, allow one immediate reply by the sacrificing side;
 - credit material recovered by that immediate reply;
+- continue tracking the exact piece that accepted the sacrifice;
+- if that piece is captured later in the PV, settle the exchange at that causal recapture;
 - calculate the remaining net deficit.
 
 The immediate recovery is considered even if the capture occurs on the last ply of the nominal six-ply horizon and the recovery therefore lies one ply beyond it.
 
-This avoids false sacrifices from ordinary exchange sequences.
+The six-ply horizon limits when the moved piece may be sacrificed; it does not prevent a later recapture of its capturer from closing the same exchange. Once that causal exchange is closed, its material investment is frozen. Material won later against an unrelated piece is not compensation for the original sacrifice.
+
+This distinction protects both directions:
+
+- a knight captured inside the horizon and recaptured several plies later is not falsely treated as a sacrifice;
+- `21.Qxb4 Bxb4 22.axb4` remains a three-point queen sacrifice even if White wins an unrelated pawn later in the PV.
 
 Promotions are excluded because the pawn object is replaced by the promoted piece and therefore does not fit the identity-tracking model. Kings are excluded.
 

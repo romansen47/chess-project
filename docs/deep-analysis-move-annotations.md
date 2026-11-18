@@ -83,6 +83,8 @@ Current responsibilities:
 - `MaterialInvestmentDetector` — tracks sacrifice of the moved piece itself.
 - `MaterialTrajectoryAnalyzer` — replays the selected PV once and identifies the causal closure of an active exchange.
 - `MaterialOfferDetector` — detects new material offers and deliberately declined saves of another piece.
+- `MaterialCompensationAnalyzer` — searches for short forcing compensation by the piece that played the candidate move.
+- `MaterialExchangeClosureAnalyzer` — verifies that recovered material remains stable through the immediate causal capture sequence.
 - `OnlyMoveDetector` — suppresses trivial/obvious `!` annotations.
 - `SearchTimeline` — shared fixed and relative depth-window handling.
 - `EvaluationScoring` — mover-centric score normalization, win-percentage conversion, candidate sorting, and root-move matching.
@@ -269,6 +271,28 @@ DECLINED_MATERIAL_SAVE
 If the piece was already unavoidably hanging, playing an unrelated move does **not** earn sacrifice credit.
 
 This distinction is essential for the Byrne-Fischer reference case `17...Be6!!`: Black deliberately declines to save the queen, and the net material offer after immediate recovery is six points.
+
+### Causal compensation for passive offers
+
+An apparent passive offer is not a sacrifice when the candidate move creates a
+forcing counter-capture that restores the original material balance. The
+responsibilities stay separate:
+
+1. `MaterialOfferDetector` records the local offer and its acceptance move.
+2. `MaterialCompensationAnalyzer` searches for forcing recovery by the piece
+   that played the candidate move.
+3. `MaterialExchangeClosureAnalyzer` verifies only the immediate capture chain
+   after recovery. If an opponent capture recreates a qualifying loss, any
+   legal mover piece may directly recapture the piece that caused it.
+
+The closure check deliberately ignores unrelated quiet continuations. Once the
+causal exchange is settled, later play must not retrospectively turn ordinary
+compensation into a sacrifice or erase a genuine one.
+
+For example, `19...Qd5 20.Qxb4 Qxf3` in Mamedyarov-Aronian is not a knight
+sacrifice: Black wins the knight on f3 in return. The immediate side line
+`21.Qxf8+ Kxf8` is also part of the same exchange closure; the recapture may be
+made by the king rather than by the queen that played `Qd5`.
 
 ### Why net material is measured before the root move
 
@@ -513,6 +537,7 @@ Protected reference cases include:
 | Byrne-Fischer | `11...Na4` | `!` |
 | Byrne-Fischer | `17...Be6` | `!!` / declined material save |
 | Byrne-Fischer | `18.Bxb6` | `?` |
+| Mamedyarov-Aronian | `19...Qd5` | no annotation / forcing material compensation |
 
 These tests intentionally make classifier changes visible during `mvn clean install`.
 

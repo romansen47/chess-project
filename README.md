@@ -392,7 +392,7 @@ CAT recognizes three concrete shapes:
 
 The active detector follows the moved piece for up to **6 plies**. After its capture, one immediate recovery move is credited so that ordinary exchanges are not mistaken for sacrifices. If the piece that accepted the sacrifice is captured only later in the same engine PV, that delayed causal recapture is also credited. The material investment is then frozen at the end of this exchange: unrelated material gains later in the PV cannot retrospectively reduce the sacrifice.
 
-Passive offers are measured relative to the material balance **before** the root move and likewise credit an immediate legal recovery. A piece that was already unavoidably hanging does not earn sacrifice credit. Short forcing compensation is validated as a causal capture sequence: after the candidate piece restores the balance, an immediate opponent capture may be answered by any legal recapturing piece. Quiet, unrelated continuations do not rewrite the settled exchange.
+Passive offers are measured relative to the material balance **before** the root move and likewise credit an immediate legal recovery. A piece that was already unavoidably hanging does not earn sacrifice credit. Short forcing compensation is validated as a causal capture sequence: after the candidate piece restores the balance, an immediate capture of that recovery piece may be answered by any legal recapturing piece. Captures elsewhere and quiet continuations do not rewrite the settled exchange.
 
 Kings are never sacrifice material. Promotions are excluded from moved-piece identity tracking.
 

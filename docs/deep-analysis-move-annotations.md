@@ -281,18 +281,17 @@ responsibilities stay separate:
 1. `MaterialOfferDetector` records the local offer and its acceptance move.
 2. `MaterialCompensationAnalyzer` searches for forcing recovery by the piece
    that played the candidate move.
-3. `MaterialExchangeClosureAnalyzer` verifies only the immediate capture chain
-   after recovery. If an opponent capture recreates a qualifying loss, any
-   legal mover piece may directly recapture the piece that caused it.
+3. `MaterialExchangeClosureAnalyzer` follows only immediate captures of the
+   piece that restored the balance. If such a capture recreates a qualifying
+   loss, any legal mover piece may directly recapture the piece that caused it.
 
 The closure check deliberately ignores unrelated quiet continuations. Once the
 causal exchange is settled, later play must not retrospectively turn ordinary
 compensation into a sacrifice or erase a genuine one.
 
 For example, `19...Qd5 20.Qxb4 Qxf3` in Mamedyarov-Aronian is not a knight
-sacrifice: Black wins the knight on f3 in return. The immediate side line
-`21.Qxf8+ Kxf8` is also part of the same exchange closure; the recapture may be
-made by the king rather than by the queen that played `Qd5`.
+sacrifice: Black wins the knight on f3 in return. A separate continuation such
+as `21.Qxf8+ Kxf8` does not rewrite that already settled exchange.
 
 ### Why net material is measured before the root move
 

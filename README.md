@@ -159,7 +159,7 @@ The only debug-only UI function at present is **Export analysis PGN**. It become
 
 ## First-time setup
 
-Native-engine setup is optional if only browser live evaluation is needed. Computer play and deep game analysis still require an appropriate backend UCI engine and profile.
+Native-engine setup is optional if only browser position/live evaluation is needed. Computer play and whole-game analysis still require an appropriate backend UCI engine and profile.
 
 ### 1. Configure UCI engines
 
@@ -169,7 +169,7 @@ CAT separates an engine executable from a reusable engine profile:
 
 - **Engines** registers executable UCI engines.
 - **Profiles** combines one registered engine with concrete UCI option values.
-- **Defaults** assigns profiles to White CPU, Black CPU, live evaluation, and deep analysis.
+- **Defaults** assigns profiles to White CPU, Black CPU, position/live evaluation, and game analysis.
 
 CAT can scan its configured discovery directory for Stockfish and Lc0. Other engines can be selected explicitly.
 
@@ -187,8 +187,8 @@ Under **Engine Settings → Defaults**, assign the desired profiles for:
 
 - White CPU;
 - Black CPU;
-- live evaluation;
-- deep analysis.
+- position/live evaluation;
+- game analysis.
 
 The analysis dialog still allows the analysis profile to be selected explicitly for each run.
 
@@ -204,14 +204,18 @@ The analysis dialog still allows the analysis profile to be selected explicitly 
 6. Choose the search mode:
    - **Depth > 0**: analyze every position to the selected depth.
    - **Depth = 0**: use **Time per position** instead.
-7. Start the analysis and wait for the complete game replay.
+7. Start the game analysis and wait for the complete replay.
 8. After completion, inspect the move list, annotations, engine variations, evaluation, and database continuations.
 
 A running analysis shows the active engine's UCI communication directly below
-the evaluation history. The protocol window is available only while Deep
-Analysis is running and disappears when the replay completes or is cancelled.
+the evaluation history. The protocol window is available only while game
+analysis is running and disappears when the replay completes or is cancelled.
 A running analysis can be cancelled. A completed analysis can be run again
-with different settings.
+with different settings. Completed runs are retained in SQLite. Once at least
+two compatible runs exist, **Compare analyses** overlays their evaluation
+histories and exposes positions with different best moves, different principal
+variations, large normalized-score gaps, or mate disagreement. Selecting an
+older run as active does not delete or rewrite any other run.
 
 Selecting a move in a completed analysis opens the stored analysis for that position. Live evaluation can refine the currently selected historical move with the same annotation classifier used by the finite analysis.
 
@@ -223,8 +227,8 @@ CAT uses four symbols:
 
 | Symbol | Meaning |
 | --- | --- |
-| `??` | Blunder: at least 25 percentage points of practical winning chance lost relative to the best engine move. |
-| `?` | Mistake: at least 10 percentage points of practical winning chance lost. |
+| `??` | Blunder: at least 25 points of normalized practical score lost relative to the best engine move. |
+| `?` | Mistake: at least 10 points of normalized practical score lost. |
 | `!!` | Extraordinary move: objectively sound and backed by a concrete material-sacrifice or deep-discovery signal. |
 | `!` | Critical, non-trivial best move with a large gap to the second-best candidate. |
 
@@ -234,7 +238,7 @@ The design principle is:
 
 > CAT marks a move `!!` only when it can name a concrete extraordinary property of an objectively sound move.
 
-The full algorithm is summarized below and documented in detail in [DeepAnalysis move annotations](docs/deep-analysis-move-annotations.md).
+The full algorithm is summarized below and documented in detail in [Game-analysis move annotations](docs/deep-analysis-move-annotations.md). The persistence and comparison model is documented in [Analysis runs and comparison](docs/analysis-runs-and-comparison.md).
 
 ### Play a game
 
@@ -325,26 +329,26 @@ This ordering is important: a tactical idea or sacrifice cannot turn an objectiv
 The concise domain specification, including component responsibilities and
 regression guarantees, lives in `chess/ANNOTATION_MODEL.md`.
 
-### Practical winning chance
+### Normalized practical score
 
 Engine scores are stored from White's point of view, then normalized to the player who made the move. Candidate moves retain the engine's authoritative MultiPV order; displayed numeric scores are not used to reorder them. This matters especially for WDL-based engines such as Leela, whose separately searched PV scores need not be strictly monotonic.
 
-For annotation thresholds, CAT converts the engine evaluation into a practical winning-chance percentage with the logistic mapping implemented by `EvaluationScoring`. This prevents very large centipawn swings in positions that are already overwhelmingly won from automatically looking like equally large practical errors.
+For annotation thresholds, CAT converts the engine evaluation into a normalized practical score with the logistic mapping implemented by `EvaluationScoring`. The mapping is not claimed to be a calibrated win probability. It prevents very large centipawn swings in positions that are already overwhelmingly won from automatically looking like equally large practical errors.
 
 ### `?` and `??`
 
 The loss is:
 
 ```text
-winChanceLoss =
-    winPercent(best candidate)
-    - winPercent(played move)
+practicalScoreLoss =
+    normalizedScore(best candidate)
+    - normalizedScore(played move)
 ```
 
 Current thresholds:
 
-- `?`: at least **10 percentage points**;
-- `??`: at least **25 percentage points**.
+- `?`: at least **10 score points**;
+- `??`: at least **25 score points**.
 
 These objective negative annotations are evaluated before any positive annotation.
 
@@ -378,7 +382,7 @@ move:
 - is within **10 percentage points** of the best move;
 - has at least three usable candidates.
 
-A material-sacrifice `!!` additionally requires that the final best line still gives the mover at least **15% practical winning chance**.
+A material-sacrifice `!!` additionally requires that the final best line still gives the mover a normalized practical score of at least **15**.
 
 #### A. Material sacrifice
 
@@ -427,7 +431,7 @@ A move that merely rises in relative rank while its own evaluation deteriorates 
 
 ### `!`: critical non-trivial best move
 
-A `!` must be rank 1 at the stable human decision point and lead rank 2 by at least **15 percentage points** of winning chance.
+A `!` must be rank 1 at the stable human decision point and lead rank 2 by at least **15 normalized-score points**.
 
 CAT suppresses `!` when the move was already trivially obvious early in the search:
 
@@ -455,7 +459,7 @@ These tests intentionally fail the build if a future algorithm change alters a p
 
 The test source contains an explicit warning: **do not simply update an expected value to make a failing build green.** First inspect the algorithm change, the chess position, and the original diagnostic engine values and decide explicitly whether the new classification is actually better.
 
-See [DeepAnalysis move annotations](docs/deep-analysis-move-annotations.md) for the complete technical description and current golden cases.
+See [Game-analysis move annotations](docs/deep-analysis-move-annotations.md) for the complete technical description and current golden cases.
 
 ## Project structure
 

@@ -1,6 +1,6 @@
-# DeepAnalysis move annotations
+# Game-analysis move annotations
 
-CAT's move annotations are deterministic chess-domain logic built on finite engine analysis. They are used by completed DeepAnalysis runs and by analysis-mode live reassessment of selected historical moves.
+CAT's move annotations are deterministic chess-domain logic built on finite engine analysis. They are used by completed game-analysis runs and by position-analysis reassessment of selected historical moves.
 
 The classifier itself never starts an engine. It receives:
 
@@ -34,8 +34,8 @@ A higher frequency of `!!` is acceptable when every annotation remains explainab
 
 | Symbol | Domain kind | Meaning |
 | --- | --- | --- |
-| `??` | `BLUNDER` | At least 25 percentage points of practical winning chance are lost relative to the best candidate. |
-| `?` | `MISTAKE` | At least 10 percentage points of practical winning chance are lost. |
+| `??` | `BLUNDER` | At least 25 points of normalized practical score are lost relative to the best candidate. |
+| `?` | `MISTAKE` | At least 10 points of normalized practical score are lost. |
 | `!!` | `EXTRAORDINARY` | Objectively sound move with qualifying material-sacrifice and/or deep-discovery evidence. |
 | `!` | `ONLY_MOVE` | Critical, non-trivial final best move. |
 
@@ -101,18 +101,19 @@ Candidate ranking is normalized to the player who made the move:
 - White mover: higher White evaluation is better.
 - Black mover: lower White evaluation is better.
 
-CAT sorts candidate lines itself and does not assume the engine emitted MultiPV lines in final quality order.
+CAT preserves the engine's authoritative MultiPV order. Displayed numeric scores are not used to reorder candidates.
 
-### Practical winning chance
+### Normalized practical score
 
-Raw engine evaluation is converted to practical winning chance by `EvaluationScoring`.
+Raw engine evaluation is converted to a normalized practical score by `EvaluationScoring`.
+This logistic score is a stable comparison scale, not a calibrated win probability.
 
 For mover-centric score `s` in pawns:
 
 ```text
 centipawns = s * 100
 
-winPercent =
+normalizedScore =
     50
     + 50 * (
         2 / (1 + exp(-0.00368208 * centipawns))
@@ -126,12 +127,12 @@ The important effect is that a large centipawn change in a position that is alre
 
 ## Layer 1: objective quality
 
-The classifier compares the practical winning chance of the best final candidate with the played move:
+The classifier compares the normalized practical score of the best final candidate with the played move:
 
 ```text
-winChanceLoss =
-    winPercent(best move)
-    - winPercent(played move)
+practicalScoreLoss =
+    normalizedScore(best move)
+    - normalizedScore(played move)
 ```
 
 Current thresholds from `MoveAnnotationPolicy`:
@@ -165,7 +166,7 @@ The final analysis must contain at least three usable candidates.
 The played move must:
 
 - be present in the final Top 3;
-- be no more than 10 percentage points of winning chance behind the final best candidate.
+- be no more than 10 normalized-score points behind the final best candidate.
 
 After this common gate, CAT checks two independent evidence families:
 
@@ -193,7 +194,7 @@ EXTRAORDINARY_MATERIAL_MIN_BEST_WIN_PERCENT = 15.0
 In addition to the common extraordinary gate:
 
 - net investment must be at least 3 material points;
-- the final best line must still give the mover at least 15% practical winning chance.
+- the final best line must still give the mover a normalized practical score of at least 15.
 
 The 15% floor prevents routine liquidation or desperate material loss in an already practically hopeless position from being promoted to `!!` merely because material disappears.
 
@@ -336,7 +337,7 @@ regret =
     - winPercent(played move in snapshot)
 ```
 
-Strength is simply the played move's own practical winning chance.
+Strength is the played move's own normalized practical score.
 
 The fixed shallow window is intentional because the annotation is human-facing: increasing the engine's final depth or thinking time must not move the definition of "early." Depth 5–8 is shallow enough to represent initial discoverability while avoiding the most volatile depth-1-to-4 output.
 
@@ -407,7 +408,7 @@ Final criticality requires:
 ONLY_MOVE_FINAL_WIN_PERCENT_GAP = 15.0
 ```
 
-The played move must be final rank 1 and lead final rank 2 by at least 15 percentage points of practical winning chance.
+The played move must be final rank 1 and lead final rank 2 by at least 15 normalized-score points.
 
 CAT then checks whether the move was already trivial early:
 
@@ -443,7 +444,7 @@ This keeps engine-relative search semantics in one place and avoids separate dep
 
 ## Finite analysis and live reassessment
 
-### Completed DeepAnalysis
+### Completed game analysis
 
 A complete analysis replays the game and stores per-position engine analysis. Move annotations are calculated by the core classifier from that finite data.
 

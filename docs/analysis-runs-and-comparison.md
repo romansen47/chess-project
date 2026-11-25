@@ -11,15 +11,17 @@ CAT uses these user-facing terms consistently:
 | Analysis run | One completed game analysis with an immutable settings snapshot. |
 | Analysis comparison | A comparison of two completed runs of the same game. |
 
-Legacy internal names such as `DeepAnalysisEngine` remain protocol and API
-compatibility names. They do not define the wording presented to users.
+Production code follows the same terminology: finite engine work is represented
+by `PositionAnalysisEngine`, while orchestration and persistence use
+`GameAnalysis` names. Only serialized aliases required to read older settings
+retain the former wording.
 
 ## Persistence boundary
 
 Completed runs are stored in the existing SQLite database. A run contains:
 
 - a stable SHA-256 key derived from the starting position and canonical UCI moves;
-- engine name and profile id;
+- profile name and id, plus the underlying engine name as an audit snapshot;
 - requested depth or time per position;
 - MultiPV and a snapshot of the configured UCI options;
 - actual depth, evaluation, mate distance, and engine-ranked principal variations for every analyzed position.

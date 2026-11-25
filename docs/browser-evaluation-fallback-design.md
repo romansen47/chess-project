@@ -7,7 +7,7 @@ Scope: live evaluation only
 
 CAT shall keep live evaluation independent from native backend engines. A bundled, lightweight Stockfish Lite WebAssembly engine runs on the browser device by default, while a configured native backend profile remains selectable.
 
-This is not a replacement for CAT's native engine architecture. Native engines remain the authoritative implementation for computer play, deep analysis and complete-game analysis.
+This is not a replacement for CAT's native engine architecture. Native engines remain the authoritative implementation for computer play and game analysis.
 
 The design must preserve CAT's module boundaries and avoid engine-specific branches in UI orchestration code.
 
@@ -16,7 +16,7 @@ The design must preserve CAT's module boundaries and avoid engine-specific branc
 The first implementation does not:
 
 - run computer opponents in the browser;
-- run deep analysis in the browser;
+- run game analysis in the browser;
 - register a browser engine as a native backend engine;
 - emulate a filesystem engine path for WebAssembly;
 - automatically start or download any engine when the application opens;
@@ -30,10 +30,10 @@ Owns chess-domain behavior and the existing Java/native-UCI abstractions:
 
 - `EvaluationEngine`;
 - `PlayerEngine`;
-- `DeepAnalysisEngine`;
+- `PositionAnalysisEngine`;
 - `EvaluationUciEngine`;
 - `PlayerUciEngine`;
-- `DeepAnalysisUciEngine`;
+- `PositionAnalysisUciEngine`;
 - UCI definitions, configuration and parsing needed by native engines.
 
 The module must not know about browsers, Web Workers, HTTP or Stockfish Lite assets.
@@ -88,7 +88,7 @@ fallbackProfileId = null
 whitePlayerProfileId = null
 blackPlayerProfileId = null
 evaluationProfileId = null
-deepAnalysisProfileId = null
+gameAnalysisProfileId = null
 ```
 
 No synthetic executable path shall be persisted.
@@ -114,7 +114,7 @@ The frontend should not infer runtime availability from profile-array contents. 
   "evaluation": { "configured": true, "available": true },
   "whitePlayer": { "configured": false, "available": false },
   "blackPlayer": { "configured": false, "available": false },
-  "deepAnalysis": { "configured": true, "available": false }
+  "gameAnalysis": { "configured": true, "available": false }
 }
 ```
 

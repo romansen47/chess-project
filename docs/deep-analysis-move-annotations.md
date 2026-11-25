@@ -503,7 +503,7 @@ chess/src/test/java/demo/chess/analysis/annotation/
     MoveAnnotationClassifierTest.java
 ```
 
-These use small deterministic `EngineLine` and `DeepAnalysisResult` fixtures to test general semantic rules without a real engine process.
+These use small deterministic `EngineLine` and `PositionAnalysisResult` fixtures to test general semantic rules without a real engine process.
 
 ### Golden real-game regression tests
 
